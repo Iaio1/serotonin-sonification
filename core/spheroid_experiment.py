@@ -9,7 +9,6 @@ from processing.find_amplitude import FindAmplitude
 from processing.normalize import Normalize
 from processing.sav_gol import SavitzkyGolayFilter
 from processing.background_subtraction import BackgroundSubtraction
-from group_analysis import GroupAnalysis
 from output_manager import OutputManager
 from processing.exponentialdecay import ExponentialFitting
 from utils import extract_timepoint
@@ -40,13 +39,17 @@ class SpheroidExperiment:
         peak_position=257,
         treatment="",
         stim_params=None,
-        processors=None  # Default to None
+        processors=None,  # Default to None
+        time_between_files= 10.0, # Default time between files (between stimulations and recodings (e.g. stimulating every 10 min and recoding) in minutes
+        files_before_treatment = 3  # Default number of files before treatment (e.g. baseline recordings)
     ):
         self.files = [SpheroidFile(fp) for fp in sorted(filepaths, key=extract_timepoint)]
         self.file_length = file_length
         self.acquisition_frequency = acquisition_frequency
         self.peak_position = peak_position
         self.treatment = treatment
+        self.time_between_files = time_between_files
+        self.files_before_treatment = files_before_treatment
 
         # Initialize processors after acquisition_frequency is set
         if processors is None:
@@ -86,12 +89,18 @@ class SpheroidExperiment:
 
     def get_file_count(self):
         return len(self.files)
+    
+    def get_number_of_files_before_treatment(self):
+        return self.files_before_treatment
 
     def get_spheroid_file(self, index):
         if 0 <= index < len(self.files):
             return self.files[index]
         else:
             raise IndexError("Spheroid file index out of range")
+
+    def get_time_between_files(self):
+        return self.time_between_files
 
     def run(self):
         """
@@ -125,8 +134,8 @@ class SpheroidExperiment:
 
 
 if __name__ == "__main__":
-    #folder = r"C:\Users\pablo\OneDrive\Documentos\1st_Year_PhD\Projects\NeuroStemVolt\data\241111_batch1_n1_Sert"
-    folder = r"/Users/pabloprieto/Library/CloudStorage/OneDrive-Personal/Documentos/1st_Year_PhD/Projects/NeuroStemVolt/data/241111_batch1_n1_Sert"
+    folder = r"C:\Users\pablo\OneDrive\Documentos\1st_Year_PhD\Projects\NeuroStemVolt\data\241111_batch1_n1_Sert"
+    #folder = r"/Users/pabloprieto/Library/CloudStorage/OneDrive-Personal/Documentos/1st_Year_PhD/Projects/NeuroStemVolt/data/241111_batch1_n1_Sert"
     filepaths = [os.path.join(folder, f) for f in os.listdir(folder) if f.endswith('.txt')]
 
     experiment = SpheroidExperiment(filepaths, treatment="Sertraline")
@@ -135,7 +144,7 @@ if __name__ == "__main__":
     print(f"First file used for baseline: {experiment.get_spheroid_file(3).get_filepath()}")
     experiment.get_spheroid_file(15).visualize_color_plot_data(title_suffix="Baseline")
     experiment.get_spheroid_file(15).visualize_3d_color_plot(title_suffix="Raw Data")
-    experiment.get_spheroid_file(15).animate_3d_color_plot(title_suffix="Processed Data")
+    #experiment.get_spheroid_file(15).animate_3d_color_plot(title_suffix="Processed Data")
     experiment.get_spheroid_file(15).visualize_IT_profile()
     experiment.get_spheroid_file(15).visualize_IT_with_exponential_decay()
     metadata = experiment.get_spheroid_file(1).get_metadata()
