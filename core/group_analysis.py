@@ -87,7 +87,7 @@ class GroupAnalysis:
 
         # Assume all experiments have the same number of files/timepoints
         n_timepoints = self.experiments[0].get_file_count()
-        files_before_treatment = self.experiments[0].get_number_of_files_before_treatment()
+        files_before_treatment = self.experiments[0].get_number_of_files_before_treatment() # This will be zero if no files before treatment
         time_points = np.linspace(
             0,
             self.experiments[0].get_time_between_files() * (n_timepoints - 1),
@@ -124,7 +124,7 @@ class GroupAnalysis:
 
         # Compute treatment time in seconds
         experiment = self.experiments[experiment_index]
-        treatment_time = files_before_treatment * experiment.get_time_between_files()
+        treatment_time = files_before_treatment * experiment.get_time_between_files() # his will be zero if no files before treatment
 
         # Split data
         before_treatment_x = time_points[:files_before_treatment]
@@ -171,7 +171,8 @@ class GroupAnalysis:
         plt.plot(time_points, mean_amplitudes, label='Mean Amplitude', color='purple')
         plt.fill_between(time_points, mean_amplitudes - std_amplitudes, mean_amplitudes + std_amplitudes,
                          color='purple', alpha=0.2, label='SD')
-        plt.axvline(x=treatment_time, color='red', linestyle='--', label='Treatment Start')
+        if files_before_treatment > 0:
+            plt.axvline(x=treatment_time, color='red', linestyle='--', label='Treatment Start')
         plt.xlabel('Time (minutes)')
         plt.ylabel('Amplitude')
         plt.title('Mean Amplitude Over Time (All Experiments)')
@@ -185,7 +186,7 @@ class GroupAnalysis:
         Plot all amplitudes over time for each experiment as separate lines.
         """
         import matplotlib.pyplot as plt
-
+        
         time_points, mean_amplitudes, all_amplitudes, files_before_treatment = self.amplitudes_over_time_all_experiments()
         all_amplitudes = np.array(all_amplitudes, dtype=float)
         treatment_time = files_before_treatment * (time_points[1] - time_points[0])
@@ -193,7 +194,8 @@ class GroupAnalysis:
         plt.figure(figsize=(10, 6))
         for i, amplitudes in enumerate(all_amplitudes):
             plt.plot(time_points, amplitudes, label=f'Experiment {i+1}', alpha=0.7)
-        plt.axvline(x=treatment_time, color='red', linestyle='--', label='Treatment Start')
+        if files_before_treatment > 0:
+            plt.axvline(x=treatment_time, color='red', linestyle='--', label='Treatment Start')
         plt.xlabel('Time (min)')
         plt.ylabel('Amplitude')
         plt.title('Amplitudes Over Time (All Experiments)')
