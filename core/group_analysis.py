@@ -48,6 +48,16 @@ class GroupAnalysis:
         """
         return self.experiments
     
+    def average_IT_over_replicates(self):
+        """
+        This method gets the IT profiles of all experiments of all files
+        and averages them over the replicates, precisely over the replicate time points.
+        Averages IT every 10 mins for example.
+        :return: Averages of IT profiles over replicates.
+        """
+        pass
+            
+
     def amplitudes_over_time_single_experiment(self, experiment_index=0):
         """
         Get the amplitudes of all experiments over time.
