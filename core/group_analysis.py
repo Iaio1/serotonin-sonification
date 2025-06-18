@@ -17,12 +17,23 @@ class GroupAnalysis:
             self.experiments = experiments
         else:
             raise ValueError("experiments must be None, a SpheroidExperiment, or a list of SpheroidExperiment objects.")
-    def add_experiment(self, experiment: SpheroidExperiment):
+        
+    def add_experiment(self, *experiments):
         """
-        Add a SpheroidExperiment to the group analysis.
-        :param experiment: An instance of SpheroidExperiment to be added.
+        Add one or more SpheroidExperiment instances to the group analysis.
+        :param experiments: One or more SpheroidExperiment instances to be added.
         """
-        self.experiments.append(experiment)
+        for experiment in experiments:
+            if isinstance(experiment, SpheroidExperiment):
+                self.experiments.append(experiment)
+            elif isinstance(experiment, list):
+                for exp in experiment:
+                    if isinstance(exp, SpheroidExperiment):
+                        self.experiments.append(exp)
+                    else:
+                        raise ValueError("All elements in the list must be SpheroidExperiment instances.")
+            else:
+                raise ValueError("Arguments must be SpheroidExperiment instances or lists of them.")
 
     def get_single_experiments(self, index: int):
         """
@@ -30,8 +41,14 @@ class GroupAnalysis:
         :return: List of SpheroidExperiment instances.
         """
         return self.experiments[index]
+    def get_experiments(self):
+        """
+        Get the list of SpheroidExperiments in the group analysis.
+        :return: List of SpheroidExperiment instances.
+        """
+        return self.experiments
     
-    def amplitudes_over_time(self, experiment_index=0):
+    def amplitudes_over_time_single_experiment(self, experiment_index=0):
         """
         Get the amplitudes of all experiments over time.
         :return: List of lists containing amplitudes for each experiment.
@@ -55,13 +72,55 @@ class GroupAnalysis:
         print(f"Amplitudes: {amplitudes}")
         return time_points, amplitudes, files_before_treatment
     
-    def plot_amplitudes_over_time(self, experiment_index=0):
+    def amplitudes_over_time_all_experiments(self):
+        """
+        Collects amplitudes for all experiments, aligns them by time point,
+        and computes the average amplitude at each time point.
+        Returns:
+            time_points: 1D array of time points
+            mean_amplitudes: 1D array of mean amplitudes at each time point
+            all_amplitudes: 2D array [experiment, time_point]
+        """
+        n_experiments = len(self.experiments)
+        if n_experiments == 0:
+            return None, None, None, None
+
+        # Assume all experiments have the same number of files/timepoints
+        n_timepoints = self.experiments[0].get_file_count()
+        files_before_treatment = self.experiments[0].get_number_of_files_before_treatment()
+        time_points = np.linspace(
+            0,
+            self.experiments[0].get_time_between_files() * (n_timepoints - 1),
+            n_timepoints
+        )
+
+        all_amplitudes = np.full((n_experiments, n_timepoints), np.nan, dtype=float)
+
+        for i, experiment in enumerate(self.experiments):
+            for j, spheroid_file in enumerate(experiment.files):
+                metadata = spheroid_file.get_metadata()
+                peak_amplitude_values = metadata['peak_amplitude_values']
+                # If peak_amplitude_values is None, empty, or zero, keep as zero
+                if peak_amplitude_values is None or (isinstance(peak_amplitude_values, np.ndarray) and peak_amplitude_values.size == 0):
+                    all_amplitudes[i, j] = 0.0
+                elif isinstance(peak_amplitude_values, np.ndarray):
+                    val = float(peak_amplitude_values[0]) if peak_amplitude_values.size == 1 else float(peak_amplitude_values)
+                    all_amplitudes[i, j] = val if val != 0 else 0.0
+                else:
+                    val = float(peak_amplitude_values)
+                    all_amplitudes[i, j] = val if val != 0 else 0.0
+
+        mean_amplitudes = np.nanmean(all_amplitudes, axis=0)
+
+        return time_points, mean_amplitudes, all_amplitudes, files_before_treatment
+    
+    def plot_amplitudes_over_time_single_experiment(self, experiment_index=0):
         """
         Plot the amplitudes of a single experiment over time, with treatment point clearly marked.
         """
         import matplotlib.pyplot as plt
 
-        time_points, amplitudes, files_before_treatment = self.amplitudes_over_time(experiment_index=experiment_index)
+        time_points, amplitudes, files_before_treatment = self.amplitudes_over_time_single_experiment(experiment_index=experiment_index)
 
         # Compute treatment time in seconds
         experiment = self.experiments[experiment_index]
@@ -94,17 +153,87 @@ class GroupAnalysis:
         plt.legend()
         plt.tight_layout()
         plt.show()
+    
+    def plot_mean_amplitudes_over_time(self):
+        """
+        Plot the mean amplitudes over time across all experiments,
+        with the standard deviation as a shaded area.
+        """
+        import matplotlib.pyplot as plt
 
+        time_points, mean_amplitudes, all_amplitudes, files_before_treatment = self.amplitudes_over_time_all_experiments()
+        all_amplitudes = np.array(all_amplitudes, dtype=float)
+        std_amplitudes = np.nanstd(all_amplitudes, axis=0)
+
+        treatment_time = files_before_treatment * (time_points[1] - time_points[0])
+
+        plt.figure(figsize=(10, 6))
+        plt.plot(time_points, mean_amplitudes, label='Mean Amplitude', color='purple')
+        plt.fill_between(time_points, mean_amplitudes - std_amplitudes, mean_amplitudes + std_amplitudes,
+                         color='purple', alpha=0.2, label='SD')
+        plt.axvline(x=treatment_time, color='red', linestyle='--', label='Treatment Start')
+        plt.xlabel('Time (minutes)')
+        plt.ylabel('Amplitude')
+        plt.title('Mean Amplitude Over Time (All Experiments)')
+        plt.legend()
+        plt.xticks(np.arange(0, max(time_points) + 1, 10), fontsize=10)
+        plt.tight_layout()
+        plt.show()
+    
+    def plot_all_amplitudes_over_time(self):
+        """
+        Plot all amplitudes over time for each experiment as separate lines.
+        """
+        import matplotlib.pyplot as plt
+
+        time_points, mean_amplitudes, all_amplitudes, files_before_treatment = self.amplitudes_over_time_all_experiments()
+        all_amplitudes = np.array(all_amplitudes, dtype=float)
+        treatment_time = files_before_treatment * (time_points[1] - time_points[0])
+
+        plt.figure(figsize=(10, 6))
+        for i, amplitudes in enumerate(all_amplitudes):
+            plt.plot(time_points, amplitudes, label=f'Experiment {i+1}', alpha=0.7)
+        plt.axvline(x=treatment_time, color='red', linestyle='--', label='Treatment Start')
+        plt.xlabel('Time (min)')
+        plt.ylabel('Amplitude')
+        plt.title('Amplitudes Over Time (All Experiments)')
+        plt.legend()
+        plt.xticks(np.arange(0, max(time_points) + 1, 10), fontsize=10)
+        plt.tight_layout()
+        plt.show()
 
 
 if __name__ == "__main__":
+    import time
+    start_time = time.time()
     # Example usage
-    #folder = r"/Users/pabloprieto/Library/CloudStorage/OneDrive-Personal/Documentos/1st_Year_PhD/Projects/NeuroStemVolt/data/241111_batch1_n1_Sert"
-    folder = r"C:\Users\pablo\OneDrive\Documentos\1st_Year_PhD\Projects\NeuroStemVolt\data\241111_batch1_n1_Sert"
-    filepaths = [os.path.join(folder, f) for f in os.listdir(folder) if f.endswith('.txt')]
-    experiment = SpheroidExperiment(filepaths, treatment="Sertraline")
-    experiment.run()
+    #folder_first_experiment = r"/Users/pabloprieto/Library/CloudStorage/OneDrive-Personal/Documentos/1st_Year_PhD/Projects/NeuroStemVolt/data/241111_batch1_n1_Sert"
+    folder_first_experiment = r"C:\Users\pablo\OneDrive\Documentos\1st_Year_PhD\Projects\NeuroStemVolt\data\241111_batch1_n1_Sert"
+    filepaths_first_experiment = [os.path.join(folder_first_experiment, f) for f in os.listdir(folder_first_experiment) if f.endswith('.txt')]
+    experiment_one = SpheroidExperiment(filepaths_first_experiment, treatment="Sertraline")
+    experiment_one.run()
+
+    folder_second_experiment = r"C:\Users\pablo\OneDrive\Documentos\1st_Year_PhD\Projects\NeuroStemVolt\data\241115_batch1_n2_Sert"
+    filepaths_second_experiment = [os.path.join(folder_second_experiment, f) for f in os.listdir(folder_second_experiment) if f.endswith('.txt')]   
+    experiment_two = SpheroidExperiment(filepaths_second_experiment, treatment="Sertraline")
+    experiment_two.run()
+
+    folder_third_experiment = r"C:\Users\pablo\OneDrive\Documentos\1st_Year_PhD\Projects\NeuroStemVolt\data\241116_batch1_n3_Sert"
+    filepaths_third_experiment = [os.path.join(folder_third_experiment, f) for f in os.listdir(folder_third_experiment) if f.endswith('.txt')]
+    experiment_three = SpheroidExperiment(filepaths_third_experiment, treatment="Sertraline")
+    experiment_three.run()
+
+    folder_fourth_experiment = r"C:\Users\pablo\OneDrive\Documentos\1st_Year_PhD\Projects\NeuroStemVolt\data\241128_batch2_n4_Sert"
+    filepaths_fourth_experiment = [os.path.join(folder_fourth_experiment, f) for f in os.listdir(folder_fourth_experiment) if f.endswith('.txt')]
+    experiment_four = SpheroidExperiment(filepaths_fourth_experiment, treatment="Sertraline")
+    experiment_four.run()
+
     group_analysis = GroupAnalysis()
-    group_analysis.add_experiment(experiment)
-    group_analysis.plot_amplitudes_over_time()
+    group_analysis.add_experiment(experiment_one, experiment_two, experiment_three, experiment_four)
+
+    time.time()
+    print("--- %s seconds ---" % (time.time() - start_time))
+
+    group_analysis.plot_mean_amplitudes_over_time()
+    group_analysis.plot_all_amplitudes_over_time()
     
