@@ -6,6 +6,7 @@ from matplotlib import cm
 from dataclasses import dataclass, field
 from typing import List
 
+from matplotlib.animation import FuncAnimation
 
 class SpheroidFile:
     """
@@ -160,6 +161,89 @@ class SpheroidFile:
         plt.show()
         return fig, ax
 
+    def animate_3d_color_plot(self, title_suffix=""):
+        """
+        Creates an animation for the 3D surface plot.
+        Starts at elev=90, azim=180, transitions to elev=0, and then to elev=0, azim=270.
+        """
+        from mpl_toolkits.mplot3d import Axes3D
+        from matplotlib import cm
+
+        # 1) Grab raw data of shape (voltage_steps, time_points):
+        D = self.processed_data
+
+        # 2) Down-sample (optional) but keep (volt, time) ordering
+        dy, dx = 10, 10
+        volt_idx = np.arange(0, D.shape[0], dy)
+        time_idx = np.arange(0, D.shape[1], dx)
+        D_small = D[np.ix_(volt_idx, time_idx)]  # shape = (V_small, T_small)
+
+        # 3) Transpose D_small so that rows → time, cols → voltage
+        Z = D_small.T  # shape = (T_small, V_small)
+
+        # 4) Build X, Y so that X[i, j] = time_idx[i], Y[i, j] = volt_idx[j]
+        T_small = time_idx
+        V_small = volt_idx
+        X, Y = np.meshgrid(T_small, V_small, indexing='xy')  # (V_small, T_small)
+        X = X.T  # now shape = (T_small, V_small)
+        Y = Y.T  # now shape = (T_small, V_small)
+
+        # 5) Color-normalize over the **full** D so it matches your 2D scale
+        vmin, vmax = np.percentile(D, 1), np.percentile(D, 99)
+        norm = mcolors.Normalize(vmin=vmin, vmax=vmax)
+        cmap = PLOT_SETTINGS().custom
+
+        # 6) Create the figure and initial 3D plot
+        fig = plt.figure(figsize=(12, 8))
+        ax = fig.add_subplot(111, projection='3d')
+        surf = ax.plot_surface(
+            X, Y, Z,
+            facecolors=cmap(norm(Z)),
+            rstride=1, cstride=1,
+            linewidth=0, antialiased=False, shade=False
+        )
+        m = cm.ScalarMappable(norm=norm, cmap=cmap)
+        m.set_array(Z)
+        fig.colorbar(m, ax=ax, shrink=0.5, aspect=10, label="Current (nA)")
+
+        ax.set_xlabel("Voltage Steps")
+        ax.set_ylabel("Time Points")
+        ax.set_zlabel("Current (nA)")
+        #ax.set_title(f"3D Surface Color Plot{': ' + title_suffix if title_suffix else ''}")
+
+        # Invert the y-axis to match the expected orientation
+        ax.invert_yaxis()
+
+        # Set the initial view
+        ax.view_init(elev=90, azim=180)
+
+
+        # Animation parameters
+        start_elev = 90
+        start_azim = 180
+        end_elev = 0
+        end_azim = 270
+        frames = 100  # Total number of frames for the animation
+
+        def update(frame):
+            # Transition from elev=90 to elev=0
+            if frame < frames // 2:
+                elev = start_elev - (start_elev - end_elev) * (frame / (frames // 2))
+                azim = start_azim
+            else:
+                # Transition from azim=180 to azim=270
+                elev = end_elev
+                azim = start_azim + (end_azim - start_azim) * ((frame - frames // 2) / (frames // 2))
+            ax.view_init(elev=elev, azim=azim)
+
+        # Create the animation
+        ani = FuncAnimation(fig, update, frames=frames, interval=50)
+
+        # Save the animation as a video file
+        ani.save("3d_plot_animation.mp4", writer="ffmpeg", dpi=300)
+
+        plt.show()
+        
     def visualize_IT_profile(self):
         """
         Visualizes the I-T profile at the specified peak position and highlights all detected peaks.
