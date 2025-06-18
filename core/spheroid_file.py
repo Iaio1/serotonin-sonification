@@ -51,6 +51,13 @@ class SpheroidFile:
 
     def get_data(self):
         return self.raw_data
+    
+    def get_processed_data_IT(self):
+        """
+        Returns the processed data for the I-T profile.
+        This is a 1D array representing the current at the peak position across all time points.
+        """
+        return self.processed_data[:, self.peak_position]
 
     def get_filepath(self):
         return self.filepath
