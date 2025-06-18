@@ -3,17 +3,34 @@ import numpy as np
 from scipy.optimize import curve_fit
 
 class ExponentialFitting(Processor):
-    def process(self, data, peak_position=257, context = None):
+    def process(self, data, peak_position=257, context=None):
         if context is not None:
-            if "peak_amplitude_positions" in context: 
+            if "peak_amplitude_positions" in context:
                 peak_amplitude_position = context["peak_amplitude_positions"]
-                IT_profile = data[:, peak_position]
-                if len(peak_amplitude_position) > 0:
-                    peak_amplitude_position = int(np.mean(peak_amplitude_position, axis=0))
+
+                # Robust empty check
+                if (isinstance(peak_amplitude_position, (list, np.ndarray)) and np.size(peak_amplitude_position) == 0):
+                    print("No peak found, skipping exponential fitting.")
+                    context["exponential fitting parameters"] = {
+                        "A": 0,
+                        "tau": 0,
+                        "C": 0,
+                        "t_half": 0,
+                    }
+                    return data
+
+                # Robust conversion to int
+                if isinstance(peak_amplitude_position, (list, np.ndarray)):
+                    if np.size(peak_amplitude_position) > 1:
+                        peak_amplitude_position = int(np.mean(peak_amplitude_position))
+                    else:
+                        peak_amplitude_position = int(np.ravel(peak_amplitude_position)[0])
                 else:
                     peak_amplitude_position = int(peak_amplitude_position)
+
+                IT_profile = data[:, peak_position]
                 y = IT_profile[peak_amplitude_position:]
-                t = np.arange(peak_amplitude_position,peak_amplitude_position + len(y))
+                t = np.arange(peak_amplitude_position, peak_amplitude_position + len(y))
                 print(y.shape, t.shape)
 
                 # Fitting the exponential decay
