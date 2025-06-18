@@ -38,12 +38,18 @@ class SpheroidExperiment:
         acquisition_frequency=10,
         peak_position=257,
         treatment="",
+        waveform="",  # Added waveform parameter
         stim_params=None,
         processors=None,  # Default to None
         time_between_files= 10.0, # Default time between files (between stimulations and recodings (e.g. stimulating every 10 min and recoding) in minutes
         files_before_treatment = 3  # Default number of files before treatment (e.g. baseline recordings)
     ):
-        self.files = [SpheroidFile(fp) for fp in sorted(filepaths, key=extract_timepoint)]
+        if waveform is None:
+            self.waveform = "5HT" # Default waveform   
+        else:
+            self.waveform = waveform
+
+        self.files = [SpheroidFile(fp, self.waveform) for fp in sorted(filepaths, key=extract_timepoint)]
         self.file_length = file_length
         self.acquisition_frequency = acquisition_frequency
         self.peak_position = peak_position
@@ -57,7 +63,7 @@ class SpheroidExperiment:
                 BackgroundSubtraction(region=(0, 10)),
                 ButterworthFilter(),
                 BaselineCorrection(),
-                Normalize(self.peak_position),
+                #Normalize(self.peak_position),
                 FindAmplitude(self.peak_position),
                 ExponentialFitting(),
                 #BackgroundSubtraction(region=(0, 10)),
@@ -138,11 +144,15 @@ if __name__ == "__main__":
     #folder = r"/Users/pabloprieto/Library/CloudStorage/OneDrive-Personal/Documentos/1st_Year_PhD/Projects/NeuroStemVolt/data/241111_batch1_n1_Sert"
     filepaths = [os.path.join(folder, f) for f in os.listdir(folder) if f.endswith('.txt')]
 
-    experiment = SpheroidExperiment(filepaths, treatment="Sertraline")
+    experiment = SpheroidExperiment(filepaths, treatment="Sertraline", waveform = "5HT")
     experiment.run()
     print(f"Number of files (timepoints) in this experiment: {experiment.get_file_count()}")
     print(f"First file used for baseline: {experiment.get_spheroid_file(3).get_filepath()}")
+    # Access the metadata of the first SpheroidFile
+    spheroid_file = experiment.get_spheroid_file(0)
+    print(spheroid_file.metadata)
     experiment.get_spheroid_file(15).visualize_color_plot_data(title_suffix="Baseline")
+    experiment.get_spheroid_file(15).visualize_cv()
     experiment.get_spheroid_file(15).visualize_3d_color_plot(title_suffix="Raw Data")
     #experiment.get_spheroid_file(15).animate_3d_color_plot(title_suffix="Processed Data")
     experiment.get_spheroid_file(15).visualize_IT_profile()

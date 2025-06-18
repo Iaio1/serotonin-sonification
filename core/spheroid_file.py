@@ -1,8 +1,11 @@
-import numpy as np 
+import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 from mpl_toolkits.mplot3d import Axes3D  # Needed for 3D plotting
 from matplotlib import cm
+from dataclasses import dataclass, field
+from typing import List
+
 from matplotlib.animation import FuncAnimation
 
 class SpheroidFile:
@@ -16,28 +19,42 @@ class SpheroidFile:
     - window_size: The size of the window for rolling mean or smoothing, default is None. (not used yet)
     - metadata: A dictionary to hold any additional metadata related to the file.
     """
-    def __init__(self, filepath):
+
+    def __init__(self, filepath, waveform="5HT"):
         self.filepath = filepath
         self.raw_data = self.load_data()
         self.processed_data = self.raw_data
-        self.peak_position = 257 # Default peak position for serotonin (5HT) in FSCV plots
-        self.window_size = None # Default window size for rolling mean or smoothing
+        # Default peak position for serotonin (5HT) in FSCV plots
+        self.peak_position = 257
+        self.window_size = None  # Default window size for rolling mean or smoothing
         self.metadata = {}
+        self.waveform = waveform  # Default waveform etc.
+        self.timeframe = self.raw_data.shape[0]
+        print(
+            f"Loaded SpheroidFile from {self.filepath} with shape {self.raw_data.shape} and waveform {self.waveform}")
 
     def load_data(self):
-        initial_data = np.loadtxt(self.filepath).T # Transpose to match (voltage steps, time points)
-        data = -initial_data # Invert the data since FSCV txt color plots will be inverted
+        # Transpose to match (voltage steps, time points)
+        initial_data = np.loadtxt(self.filepath).T
+        data = -initial_data  # Invert the data since FSCV txt color plots will be inverted
         return data
-    
+
     def set_peak_position(self, peak_position):
         self.peak_position = peak_position
-    
+
+    def set_waveform(self, waveform):
+        """
+        Sets the waveform type for the spheroid file.
+        This can be used to differentiate between different types of stimulation or analysis.
+        """
+        self.waveform = waveform
+
     def get_data(self):
         return self.raw_data
-        
+
     def get_filepath(self):
         return self.filepath
-        
+
     def update_metadata(self, context):
         """
         Updates the metadata with the provided context.
@@ -46,38 +63,40 @@ class SpheroidFile:
 
     def get_metadata(self):
         return self.metadata
-    
+
     def visualize_color_plot_data(self, title_suffix=""):
         # Initialize plot settings
         plot_settings = PLOT_SETTINGS()
         custom_cmap = plot_settings.custom
-        
+
         # Use the loaded data
         processed_data = self.processed_data
-        
+
         # Calculate limits
         vmin = np.percentile(processed_data, 1)
         vmax = np.percentile(processed_data, 99)
 
         # Create and save plot
         fig, ax = plt.subplots(figsize=(10, 6))
-        im = ax.imshow(processed_data.T, # Transpose to match time points and voltage steps, imshow expects (y, x)
-                      aspect='auto', 
-                      cmap=custom_cmap, 
-                      origin='lower',
-                      extent = [0, processed_data.shape[0], 0, processed_data.shape[1]],
-                      vmin=vmin, 
-                      vmax=vmax)
+        im = ax.imshow(processed_data.T,  # Transpose to match time points and voltage steps, imshow expects (y, x)
+                       aspect='auto',
+                       cmap=custom_cmap,
+                       origin='lower',
+                       extent=[0, processed_data.shape[0],
+                               0, processed_data.shape[1]],
+                       vmin=vmin,
+                       vmax=vmax)
         plt.colorbar(im, ax=ax, label="Current (nA)")
         ax.set_xlabel("Time Points")
         ax.set_ylabel("Voltage Steps")
-        ax.set_title(f"Color Plot{': ' + title_suffix if title_suffix else ''}\nRange: [{vmin:.2f}, {vmax:.2f}] nA")
-        
+        ax.set_title(
+            f"Color Plot{': ' + title_suffix if title_suffix else ''}\nRange: [{vmin:.2f}, {vmax:.2f}] nA")
+
         plt.tight_layout()
         plt.show()
 
         return fig, ax
-        
+
     def visualize_3d_color_plot(self, title_suffix=""):
         """
         3D surface with the same orientation as:
@@ -86,7 +105,7 @@ class SpheroidFile:
         """
         from mpl_toolkits.mplot3d import Axes3D
         from matplotlib import cm
-        
+
         # 1) grab raw D of shape (voltage_steps, time_points):
         D = self.processed_data
 
@@ -94,15 +113,18 @@ class SpheroidFile:
         dy, dx = 10, 10
         volt_idx = np.arange(0, D.shape[0], dy)
         time_idx = np.arange(0, D.shape[1], dx)
-        D_small = D[np.ix_(volt_idx, time_idx)]      # shape = (V_small, T_small)
+        # shape = (V_small, T_small)
+        D_small = D[np.ix_(volt_idx, time_idx)]
 
         # 3) transpose D_small so that rows→time, cols→voltage
-        Z = D_small.T                                # shape = (T_small, V_small)
+        # shape = (T_small, V_small)
+        Z = D_small.T
 
         # 4) build X,Y so that X[i,j] = time_idx[i], Y[i,j] = volt_idx[j]
         T_small = time_idx
         V_small = volt_idx
-        X, Y = np.meshgrid(T_small, V_small, indexing='xy')  # (V_small, T_small)
+        # (V_small, T_small)
+        X, Y = np.meshgrid(T_small, V_small, indexing='xy')
         X = X.T  # now shape = (T_small, V_small)
         Y = Y.T  # now shape = (T_small, V_small)
 
@@ -113,7 +135,7 @@ class SpheroidFile:
 
         # 6) plot
         fig = plt.figure(figsize=(12, 8))
-        ax  = fig.add_subplot(111, projection='3d')
+        ax = fig.add_subplot(111, projection='3d')
         surf = ax.plot_surface(
             X, Y, Z,
             facecolors=cmap(norm(Z)),
@@ -127,13 +149,14 @@ class SpheroidFile:
         ax.set_xlabel("Voltage Steps")
         ax.set_ylabel("Time Points")
         ax.set_zlabel("Current (nA)")
-        ax.set_title(f"3D Surface Color Plot{': ' + title_suffix if title_suffix else ''}")
+        ax.set_title(
+            f"3D Surface Color Plot{': ' + title_suffix if title_suffix else ''}")
 
         # if your 2D used origin='lower', flip Y so the “0 V” is at the front
         ax.invert_yaxis()
         ax.view_init(elev=30, azim=180)
         ax.grid(False)
-        
+
         plt.tight_layout()
         plt.show()
         return fig, ax
@@ -235,11 +258,15 @@ class SpheroidFile:
         # Highlight all peak positions if available in metadata
         if 'peak_amplitude_positions' in self.metadata:
             peak_indices = self.metadata['peak_amplitude_positions']
-            peak_values = self.metadata.get('peak_amplitude_values', profile[peak_indices])
+            peak_values = self.metadata.get(
+                'peak_amplitude_values', profile[peak_indices])
             print(f"Peak indices from metadata: {peak_indices}")
-            for peak_idx, peak_val in zip(peak_indices, peak_values): # Iterate over index-value pairs
-                if 0 <= peak_idx < len(profile): # Check the peak is within bounds
-                    ax.scatter(peak_idx, peak_val, color='red', label="Peak Amplitude", zorder=5)
+            # Iterate over index-value pairs
+            for peak_idx, peak_val in zip(peak_indices, peak_values):
+                # Check the peak is within bounds
+                if 0 <= peak_idx < len(profile):
+                    ax.scatter(peak_idx, peak_val, color='red',
+                               label="Peak Amplitude", zorder=5)
                     ax.annotate(f"({peak_idx}, {peak_val:.2f})",
                                 (peak_idx, peak_val),
                                 textcoords="offset points",
@@ -268,8 +295,9 @@ class SpheroidFile:
 
         # Extract the exponential decay parameters from metadata
         if "exponential fitting parameters" not in self.metadata:
-            raise ValueError("Exponential fitting parameters are missing from metadata.")
-        
+            raise ValueError(
+                "Exponential fitting parameters are missing from metadata.")
+
         params = self.metadata["exponential fitting parameters"]
         A = params["A"]
         tau = params["tau"]
@@ -278,12 +306,13 @@ class SpheroidFile:
 
         # Extract the peak position from metadata
         if "peak_amplitude_positions" not in self.metadata:
-            raise ValueError("Peak amplitude positions are missing from metadata.")
-        
+            raise ValueError(
+                "Peak amplitude positions are missing from metadata.")
+
         peak_positions = self.metadata["peak_amplitude_positions"]
         if len(peak_positions) == 0:
             raise ValueError("No peak positions found in metadata.")
-        
+
         peak_position = int(peak_positions[0])  # Use the first peak position
 
         # Slice the profile starting from the peak position
@@ -294,17 +323,22 @@ class SpheroidFile:
         exp_decay_curve = A * np.exp(-t / tau) + C
 
         # Calculate the corresponding position and value for t_half
-        t_half_position = peak_position + int(t_half)  # Convert t_half to the corresponding position
-        t_half_value = A * np.exp(-t_half / tau) + C  # Value of the exponential decay at t_half
+        # Convert t_half to the corresponding position
+        t_half_position = peak_position + int(t_half)
+        # Value of the exponential decay at t_half
+        t_half_value = A * np.exp(-t_half / tau) + C
 
         # Create the plot
         fig, ax = plt.subplots(figsize=(10, 6))
         ax.plot(profile, color='blue', linewidth=1.5, label="I-T Profile")
-        ax.scatter(peak_position, profile[peak_position], color='red', label="Detected Peak", zorder=5)
-        ax.plot(t, exp_decay_curve, color='green', linestyle='--', label="Exponential Decay Fit")
+        ax.scatter(peak_position, profile[peak_position],
+                   color='red', label="Detected Peak", zorder=5)
+        ax.plot(t, exp_decay_curve, color='green',
+                linestyle='--', label="Exponential Decay Fit")
 
         # Plot the half-life (t_half)
-        ax.axvline(x=t_half_position, color='purple', linestyle=':', label=f"t_half = {t_half:.2f}")
+        ax.axvline(x=t_half_position, color='purple',
+                   linestyle=':', label=f"t_half = {t_half:.2f}")
 
         # Add labels, title, and legend
         ax.set_xlabel("Time Points")
@@ -316,11 +350,118 @@ class SpheroidFile:
         # Show the plot
         plt.show()
 
+    def visualize_cv(self, time_sec=84, smooth=False, sg_window=11, sg_poly=3):
+        """
+        Visualize a cyclic voltammogram (CV) at a given time point using the reconstructed voltage waveform.
+
+        Args:
+            time_sec (int): Index or timepoint (in seconds) from which to extract the CV.
+            smooth (bool): If True, apply Savitzky-Golay smoothing to the current trace (not implemented here).
+            sg_window (int): Window size for Savitzky-Golay filter.
+            sg_poly (int): Polynomial order for Savitzky-Golay filter.
+
+        Returns:
+            fig, ax: Matplotlib Figure and Axes objects of the generated plot.
+        """
+        if self.waveform != "5HT":
+            raise ValueError(
+                "This method is currently only implemented for the 5HT waveform.")
+
+        # Generate the voltage waveform based on the 5HT scan parameters and number of data points
+        wf = Waveforms(0.2, [1.0, -0.1], 0.2, 1000,
+                       self.processed_data.shape[1])
+        voltage = wf.voltage_waveform()
+
+        # Extract current values for the requested CV (time point)
+        current = self.processed_data[time_sec, :]
+
+        # Find the peak current and corresponding voltage
+        peak_i = np.argmax(current)
+        peak_V = voltage[peak_i]
+        peak_I = current[peak_i]
+
+        # Plot
+        fig, ax = plt.subplots(figsize=(10, 6))
+        ax.plot(voltage, current, label="CV", color="blue", lw=1.5)
+        ax.scatter([peak_V], [peak_I], color="red", zorder=5)
+        ax.annotate(f"Current peak: {peak_V:.2f} V",
+                    xy=(peak_V, peak_I),
+                    xytext=(peak_V + 0.1, peak_I + 0.1),
+                    arrowprops=dict(arrowstyle="->"))
+
+        ax.set_xlabel("Voltage (V)", fontsize=18)
+        ax.set_ylabel("Current (nA)", fontsize=18)
+        ax.set_title(f"Cyclic Voltammogram at {time_sec:.1f} s", fontsize=16)
+        ax.legend(fontsize=14)
+        ax.grid(False)
+        plt.tight_layout()
+        plt.show()
+
+        return fig, ax
+
+
+@dataclass
+class Waveforms:
+    """FSCV waveform voltage generator
+
+    Attributes:
+        Vstart (float): Starting voltage of the waveform.
+        Vvertices (List[float]): List of vertex voltages (any number allowed).
+        Vend (float): Final voltage at the end of the scan.
+        scan_rate (int): Scan rate in V/s.
+        N_data_points (int): Total number of data points in the scan.
+
+    Methods:
+        get_segments(): Returns list of (start, end) voltage pairs for each segment.
+        segment_times(): Returns duration of each segment in seconds.
+        total_time(): Returns total scan time.
+        voltage_waveform(): Returns numpy array with voltage for each point.
+    """
+    Vstart: float = 0.2
+    Vvertices: List[float] = field(default_factory=lambda: [1, -0.1])
+    Vend: float = 0.2
+    scan_rate: int = 1000
+    N_data_points: int = 1100
+
+    def get_segments(self):
+        """Generate consecutive (start, end) pairs for all waveform segments."""
+        v_points = [self.Vstart] + self.Vvertices + [self.Vend]
+        return list(zip(v_points[:-1], v_points[1:]))
+
+    def segment_times(self):
+        """Calculate the duration (s) of each segment based on scan rate."""
+        return [abs(e - s) / self.scan_rate for s, e in self.get_segments()]
+
+    def total_time(self):
+        """Return total duration of the scan (s)."""
+        return sum(self.segment_times())
+
+    def voltage_waveform(self):
+        """
+        Generate the complete voltage waveform for all points in the scan.
+
+        Returns:
+            np.array: Array of voltages, length = N_data_points.
+        """
+        segs = self.get_segments()
+        times = self.segment_times()
+        total_time = self.total_time()
+
+        points = [int(t / total_time * self.N_data_points) for t in times]
+        points[-1] = self.N_data_points - sum(points[:-1])
+
+        voltage = []
+        for (start, end), npts in zip(segs, points):
+            voltage.extend(list(np.linspace(start, end, npts, endpoint=False)))
+        return np.array(voltage)
+
+
 class PLOT_SETTINGS:
     def __init__(self):
         # Custom colormap only
         self.custom = self.get_continuous_cmap(
-            ['#001524','#002f5e','#f4c300','#a84900','#64005f','#00a37a','#00751c','#00ff00'],
+            ['#001524', '#002f5e', '#f4c300', '#a84900',
+                '#64005f', '#00a37a', '#00751c', '#00ff00'],
             [0, 0.2478, 0.3805, 0.6555, 0.701, 0.7603, 0.7779, 1]
         )
 
@@ -331,9 +472,11 @@ class PLOT_SETTINGS:
 
         cdict = dict()
         for num, col in enumerate(['red', 'green', 'blue']):
-            col_list = [[float_list[i], rgb_list[i][num], rgb_list[i][num]] for i in range(len(float_list))]
+            col_list = [[float_list[i], rgb_list[i][num], rgb_list[i][num]]
+                        for i in range(len(float_list))]
             cdict[col] = col_list
-        cmp = mcolors.LinearSegmentedColormap('my_cmp', segmentdata=cdict, N=256)
+        cmp = mcolors.LinearSegmentedColormap(
+            'my_cmp', segmentdata=cdict, N=256)
         return cmp
 
     def hex_to_rgb(self, value):
@@ -344,9 +487,12 @@ class PLOT_SETTINGS:
     def rgb_to_dec(self, value):
         return [v/256 for v in value]
 
+
 if __name__ == "__main__":
-    Spheroid_test = SpheroidFile(r"C:\Users\pablo\OneDrive\Documentos\1st_Year_PhD\Projects\NeuroStemVolt\data\241111_batch1_n1_Sert\04_-30_COLOR.txt")
-    Spheroid_test.visualize_color_plot_data("")
-    plt.show()
-    Spheroid_test.visualize_IT_profile()
+    Spheroid_test = SpheroidFile(
+        r"/Users/tomas/Developer/NeuroStemVolt/data/006 no event_COLOR.txt")
+    # Spheroid_test.visualize_color_plot_data("")
+    # plt.show()
+    # Spheroid_test.visualize_IT_profile()
+    Spheroid_test.visualize_cv()
     plt.show()

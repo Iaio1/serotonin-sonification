@@ -1,4 +1,5 @@
 data/
+output/
 core/__pycache__/
 core/processing/__pycache__/
 *.pyc
