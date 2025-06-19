@@ -302,8 +302,6 @@ class GroupAnalysis:
         plt.tight_layout()
         plt.show()
 
-<<<<<<< Updated upstream
-=======
     def plot_unprocessed_first_ITs(self):
         """
         Plots the unprocessed first ITs of replicates.
@@ -338,7 +336,6 @@ class GroupAnalysis:
         plt.tight_layout()
         plt.show()
         
->>>>>>> Stashed changes
 
 if __name__ == "__main__":
     import time
