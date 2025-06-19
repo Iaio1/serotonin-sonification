@@ -302,20 +302,43 @@ class GroupAnalysis:
         plt.tight_layout()
         plt.show()
 
+<<<<<<< Updated upstream
+=======
     def plot_unprocessed_first_ITs(self):
+        """
+        Plots the unprocessed first ITs of replicates.
+        The x-axis represents the amplitude of the signal, and the y-axis represents time in seconds.
+        """
         import matplotlib.pyplot as plt
+
+        # Get the unprocessed first ITs
         first_ITs = self.non_normalized_first_ITs()
-        # Number of replicates (rows in mean_ITs)
-        n_files = first_ITs.shape[0]
-        # Time points (columns in mean_ITs)
-        time_points = np.arange(first_ITs.shape[1])
-        for i in range(n_files):
-            plt.plot(time_points, first_ITs[i,:], label=f"Replicate {i+1}", color="blue", alpha=0.7)
-        plt.title("Unprocessed First ITs of Replicates")
+
+        # Number of replicates (rows in first_ITs)
+        n_replicates = first_ITs.shape[0]
+
+        # Time points (y-axis: seconds)
+        time_points = np.linspace(0, self.experiments[0].get_file_length(), first_ITs.shape[1])
+
+        # Create the plot
+        plt.figure(figsize=(12, 8))
+
+        # Plot each replicate
+        for i in range(n_replicates):
+            plt.plot(time_points,first_ITs[i, :], label=f"Replicate {i+1}", alpha=0.7)
+
+        # Add labels, title, and legend
+        plt.ylabel("Amplitude (nA)", fontsize=14)
+        plt.xlabel("Time (seconds)", fontsize=14)
+        plt.title("Unprocessed First ITs of Replicates", fontsize=16)
         plt.legend(fontsize=10, loc="upper right")
         plt.grid(False)
+
+        # Show the plot
         plt.tight_layout()
         plt.show()
+        
+>>>>>>> Stashed changes
 
 if __name__ == "__main__":
     import time
