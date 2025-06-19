@@ -190,23 +190,25 @@ class GroupAnalysis:
         files_before_treatment = self.experiments[0].get_number_of_files_before_treatment() # This will be zero if no files before treatment
         
         all_ITs = np.empty((n_experiments, n_timepoints))
-        peak_positions = []
+        peak_amplitude_positions = []
 
         actual_index = replicate_time_point + files_before_treatment
         for i, experiment in enumerate(self.experiments):
             file = experiment.get_spheroid_file(actual_index)
             IT_individual = file.get_processed_data_IT()
             metadata = file.get_metadata()
-            peak_positions.append(metadata["peak_position"])
+            peak_amplitude_positions.append(metadata["peak_amplitude_positions"])
             all_ITs[i, :] = IT_individual
 
-        global_peak_position = int(np.mean(peak_positions))
-        cropped_ITs = all_ITs[:, global_peak_position:]
+        print(peak_amplitude_positions)
+        global_peak_amplitude_position = int(np.mean(peak_amplitude_positions))
+        print(global_peak_amplitude_position)
+        cropped_ITs = all_ITs[:, global_peak_amplitude_position:]
 
         ITs_flattened = cropped_ITs.flatten()
         n_cropped_timepoints = np.shape(cropped_ITs)
 
-        A = np.arange(global_peak_position, n_timepoints)
+        A = np.arange(global_peak_amplitude_position, n_timepoints)
         time_all = np.tile(A, n_experiments)  # Repeat time point
 
         #print("Len ITs Flattened:", len(ITs_flattened))
@@ -219,7 +221,7 @@ class GroupAnalysis:
         # C: baseline (last value of the mean trace)
         mean_trace = np.mean(cropped_ITs, axis=0)
         A0 = float(np.max(mean_trace) - np.min(mean_trace))
-        tau0 = (n_timepoints - global_peak_position) / 3.0
+        tau0 = (n_timepoints - global_peak_amplitude_position) / 3.0
         C0 = float(mean_trace[-1])
         p0 = [A0, tau0, C0]
 
@@ -241,45 +243,71 @@ class GroupAnalysis:
 
         return time_all, ITs_flattened, t_half, popt, pcov,  A_fit, tau_fit, C_fit
 
-    def plot_exponential_fit_with_CI(self,replicate_time_point=0):
+    def plot_exponential_fit_with_CI(self, replicate_time_point=0):
         import matplotlib.pyplot as plt
-        time_all, ITs_flattened, t_half, popt, pcov,  A_fit, tau_fit, C_fit = self.exponential_fitting_replicated(replicate_time_point=replicate_time_point)
-        A_fit, tau_fit, C_fit = popt
-        perr = np.sqrt(np.diag(pcov))  # 1-sigma confidence interval
-
-        # Unique sorted time points for plotting
-        t_fit = np.linspace(min(time_all), max(time_all), 500)
-        y_fit = exp_decay(t_fit, *popt)
-
-        # Confidence interval propagation (linear approximation)
-        # Compute upper/lower bounds using parameter uncertainty
         from scipy.stats import t
-        dof = max(0, len(time_all) - len(popt))  # degrees of freedom
-        t_val = t.ppf(0.975, dof)  # 95% confidence interval
+        import numpy as np
 
-        # Jacobian of exp_decay with respect to params: A, tau, C
+        # Run the fitting function to get values and data
+        time_all, ITs_flattened, t_half, popt, pcov, A_fit, tau_fit, C_fit = self.exponential_fitting_replicated(replicate_time_point=replicate_time_point)
+        A_fit, tau_fit, C_fit = popt
+        perr = np.sqrt(np.diag(pcov))  # 1-sigma CI
+
+        # Retrieve full ITs and metadata again for plotting full traces
+        n_experiments = len(self.experiments)
+        n_timepoints = self.experiments[0].get_file_time_points()
+        files_before_treatment = self.experiments[0].get_number_of_files_before_treatment()
+        actual_index = replicate_time_point + files_before_treatment
+
+        all_ITs = np.empty((n_experiments, n_timepoints))
+        peak_positions = []
+
+        for i, experiment in enumerate(self.experiments):
+            file = experiment.get_spheroid_file(actual_index)
+            IT_individual = file.get_processed_data_IT()
+            metadata = file.get_metadata()
+            peak_positions.append(metadata["peak_amplitude_positions"])
+            all_ITs[i, :] = IT_individual
+
+        global_peak_position = int(np.mean(peak_positions))
+        mean_trace_full = np.mean(all_ITs, axis=0)
+
+        # Time array for full profile
+        full_time = np.arange(n_timepoints)
+
+        # Time for fitting and prediction
+        t_fit = np.linspace(global_peak_position, n_timepoints - 1, 500)
+        y_fit = A_fit * np.exp(-t_fit / tau_fit) + C_fit
+
+        # 95% CI using Jacobian
+        dof = max(0, len(time_all) - len(popt))
+        t_val = t.ppf(0.975, dof)
+
         J = np.empty((len(t_fit), 3))
-        J[:, 0] = np.exp(-t_fit / tau_fit)         # d/dA
-        J[:, 1] = A_fit * t_fit / tau_fit**2 * np.exp(-t_fit / tau_fit)  # d/dtau
-        J[:, 2] = 1                                # d/dC
+        J[:, 0] = np.exp(-t_fit / tau_fit)
+        J[:, 1] = A_fit * t_fit / tau_fit**2 * np.exp(-t_fit / tau_fit)
+        J[:, 2] = 1
 
         ci = np.sqrt(np.sum((J @ pcov) * J, axis=1)) * t_val
         y_lower = y_fit - ci
         y_upper = y_fit + ci
 
-        # Plotting
+        # Plot
         plt.figure(figsize=(10, 6))
-        plt.scatter(time_all, ITs_flattened, alpha=0.4, label='Data', s=10)
-        plt.plot(t_fit, y_fit, label='Exponential fit', color='red', linewidth=2)
+        plt.plot(full_time, mean_trace_full, label="Mean I-T Profile", color='blue')
+        plt.plot(t_fit, y_fit, label='Exponential Fit', color='red', linewidth=2)
         plt.fill_between(t_fit, y_lower, y_upper, color='red', alpha=0.3, label='95% CI')
-        
-        plt.xlabel('Time')
-        plt.ylabel('Intensity')
-        plt.title('Exponential Fit with 95% Confidence Interval')
+        plt.axvline(global_peak_position, color='orange', linestyle='--', label=f"Peak @ {global_peak_position}")
+        plt.axvline(global_peak_position + int(t_half), color='purple', linestyle=':', label=f"t_half ≈ {t_half:.2f}")
+
+        plt.xlabel("Time Points")
+        plt.ylabel("Intensity")
+        plt.title("Full I-T Profile with Exponential Fit & CI")
         plt.legend()
         plt.grid(True)
         plt.tight_layout()
         plt.show()
+
 
 
     def plot_amplitudes_over_time_single_experiment(self, experiment_index=0):
