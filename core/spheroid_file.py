@@ -51,6 +51,20 @@ class SpheroidFile:
 
     def get_data(self):
         return self.raw_data
+    
+    def get_processed_data(self):
+        """
+        Returns the processed data.
+        This is a 2D array where rows represent voltage steps and columns represent time points.
+        """
+        return self.processed_data
+    
+    def get_processed_data_IT(self):
+        """
+        Returns the processed data for the I-T profile.
+        This is a 1D array representing the current at the peak position across all time points.
+        """
+        return self.processed_data[:, self.peak_position]
 
     def get_filepath(self):
         return self.filepath
@@ -490,9 +504,10 @@ class PLOT_SETTINGS:
 
 if __name__ == "__main__":
     Spheroid_test = SpheroidFile(
-        r"/Users/tomas/Developer/NeuroStemVolt/data/006 no event_COLOR.txt")
-    # Spheroid_test.visualize_color_plot_data("")
+        r"/Users/pabloprieto/Library/CloudStorage/OneDrive-Personal/Documentos/1st_Year_PhD/Projects/NeuroStemVolt/data/241111_batch1_n1_Sert/04_-30_COLOR.txt")
+    data = Spheroid_test.get_processed_data()
+    print(f"Data shape: {data.shape}")
     # plt.show()
-    # Spheroid_test.visualize_IT_profile()
+    Spheroid_test.visualize_color_plot_data()
     Spheroid_test.visualize_cv()
     plt.show()
