@@ -253,8 +253,9 @@ class GroupAnalysis:
         A_fit, tau_fit, C_fit = popt
         perr = np.sqrt(np.diag(pcov))  # 1-sigma CI
 
-        # Retrieve full ITs and metadata again for plotting full traces
+        # Retrieve full ITs and metadata again for plotting individual traces
         n_experiments = len(self.experiments)
+        file_duration = self.experiments[0].get_file_length()
         n_timepoints = self.experiments[0].get_file_time_points()
         files_before_treatment = self.experiments[0].get_number_of_files_before_treatment()
         actual_index = replicate_time_point + files_before_treatment
@@ -266,11 +267,11 @@ class GroupAnalysis:
             file = experiment.get_spheroid_file(actual_index)
             IT_individual = file.get_processed_data_IT()
             metadata = file.get_metadata()
-            peak_positions.append(metadata["peak_amplitude_positions"])
+            peak_pos = metadata.get("peak_amplitude_positions")
+            peak_positions.append(peak_pos)
             all_ITs[i, :] = IT_individual
 
         global_peak_position = int(np.mean(peak_positions))
-        mean_trace_full = np.mean(all_ITs, axis=0)
 
         # Time array for full profile
         full_time = np.arange(n_timepoints)
@@ -294,21 +295,31 @@ class GroupAnalysis:
 
         # Plot
         plt.figure(figsize=(10, 6))
-        plt.plot(full_time, mean_trace_full, label="Mean I-T Profile", color='blue')
+
+        # Plot each replicate I-T trace
+        for i in range(n_experiments):
+            plt.plot(full_time, all_ITs[i, :], alpha=0.4, linewidth=1, label=f"Replicate {i+1}" if i == 0 else None)
+
+        # Plot fit and CI
         plt.plot(t_fit, y_fit, label='Exponential Fit', color='red', linewidth=2)
         plt.fill_between(t_fit, y_lower, y_upper, color='red', alpha=0.3, label='95% CI')
+
+        # Mark peak and t_half
         plt.axvline(global_peak_position, color='orange', linestyle='--', label=f"Peak @ {global_peak_position}")
         plt.axvline(global_peak_position + int(t_half), color='purple', linestyle=':', label=f"t_half ≈ {t_half:.2f}")
 
-        plt.xlabel("Time Points")
-        plt.ylabel("Intensity")
-        plt.title("Full I-T Profile with Exponential Fit & CI")
+        plt.xlabel("Time Points (seconds)")
+        print("File duration:",file_duration)
+        # Set ticks at every 10 seconds => every 100 time points
+        tick_locs = np.arange(0, 601, 100)       # 0, 100, 200, ..., 600
+        tick_labels = [str(int(x / 10)) for x in tick_locs]  # convert to seconds: 0, 10, ..., 60
+        plt.xticks(tick_locs, tick_labels, fontsize=10)
+        plt.ylabel("Current (nA)")
+        plt.title("Replicate I-T Profiles with Exponential Fit & CI")
         plt.legend()
-        plt.grid(True)
+        plt.grid(False)
         plt.tight_layout()
         plt.show()
-
-
 
     def plot_amplitudes_over_time_single_experiment(self, experiment_index=0):
         """
