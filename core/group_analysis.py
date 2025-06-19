@@ -205,12 +205,13 @@ class GroupAnalysis:
 
         ITs_flattened = cropped_ITs.flatten()
         n_cropped_timepoints = np.shape(cropped_ITs)
-        print("Len ITs Flattened:", len(ITs_flattened))
+
         A = np.arange(global_peak_position, n_timepoints)
         time_all = np.tile(A, n_experiments)  # Repeat time point
-        
-        print("ITs_Flattened", np.shape(ITs_flattened))
-        print("Time All", np.shape(time_all))
+
+        #print("Len ITs Flattened:", len(ITs_flattened))
+        #print("ITs_Flattened", np.shape(ITs_flattened))
+        #print("Time All", np.shape(time_all))
 
         # Improved initial guess for parameters
         # A: amplitude (difference between max and min of cropped ITs)
@@ -235,6 +236,51 @@ class GroupAnalysis:
         print(f"A   = {A_fit:.2f} ± {perr[0]:.2f}")
         print(f"tau = {tau_fit:.2f} ± {perr[1]:.2f}")
         print(f"C   = {C_fit:.2f} ± {perr[2]:.2f}")
+
+        t_half = np.log(2) * tau_fit
+
+        return time_all, ITs_flattened, t_half, popt, pcov,  A_fit, tau_fit, C_fit
+
+    def plot_exponential_fit_with_CI(self,replicate_time_point=0):
+        import matplotlib.pyplot as plt
+        time_all, ITs_flattened, t_half, popt, pcov,  A_fit, tau_fit, C_fit = self.exponential_fitting_replicated(replicate_time_point=replicate_time_point)
+        A_fit, tau_fit, C_fit = popt
+        perr = np.sqrt(np.diag(pcov))  # 1-sigma confidence interval
+
+        # Unique sorted time points for plotting
+        t_fit = np.linspace(min(time_all), max(time_all), 500)
+        y_fit = exp_decay(t_fit, *popt)
+
+        # Confidence interval propagation (linear approximation)
+        # Compute upper/lower bounds using parameter uncertainty
+        from scipy.stats import t
+        dof = max(0, len(time_all) - len(popt))  # degrees of freedom
+        t_val = t.ppf(0.975, dof)  # 95% confidence interval
+
+        # Jacobian of exp_decay with respect to params: A, tau, C
+        J = np.empty((len(t_fit), 3))
+        J[:, 0] = np.exp(-t_fit / tau_fit)         # d/dA
+        J[:, 1] = A_fit * t_fit / tau_fit**2 * np.exp(-t_fit / tau_fit)  # d/dtau
+        J[:, 2] = 1                                # d/dC
+
+        ci = np.sqrt(np.sum((J @ pcov) * J, axis=1)) * t_val
+        y_lower = y_fit - ci
+        y_upper = y_fit + ci
+
+        # Plotting
+        plt.figure(figsize=(10, 6))
+        plt.scatter(time_all, ITs_flattened, alpha=0.4, label='Data', s=10)
+        plt.plot(t_fit, y_fit, label='Exponential fit', color='red', linewidth=2)
+        plt.fill_between(t_fit, y_lower, y_upper, color='red', alpha=0.3, label='95% CI')
+        
+        plt.xlabel('Time')
+        plt.ylabel('Intensity')
+        plt.title('Exponential Fit with 95% Confidence Interval')
+        plt.legend()
+        plt.grid(True)
+        plt.tight_layout()
+        plt.show()
+
 
     def plot_amplitudes_over_time_single_experiment(self, experiment_index=0):
         """
@@ -443,6 +489,7 @@ if __name__ == "__main__":
 
     #group_analysis.plot_mean_ITs()
     group_analysis.exponential_fitting_replicated()
+    group_analysis.plot_exponential_fit_with_CI(replicate_time_point=1)
     #group_analysis.plot_unprocessed_first_ITs()
     #group_analysis.plot_mean_amplitudes_over_time()
     #group_analysis.plot_all_amplitudes_over_time()
