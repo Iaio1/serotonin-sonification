@@ -52,6 +52,9 @@ class SpheroidFile:
     def get_data(self):
         return self.raw_data
     
+    def get_original_data_IT(self):
+        return self.raw_data[:, self.peak_position] 
+    
     def get_processed_data(self):
         """
         Returns the processed data.

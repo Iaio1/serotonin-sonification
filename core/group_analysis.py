@@ -48,6 +48,28 @@ class GroupAnalysis:
         """
         return self.experiments
     
+    def non_normalized_first_ITs(self):
+        """
+        This method gets the ITs of the first stimulation per experiment (per replicate)
+        The ITs are obtained from the original data, completely unprocessed.
+        returns: First ITs over replicates as a matrix
+        """
+        n_experiments = len(self.experiments)
+        if n_experiments == 0:
+            return None
+        
+        # Assume all experiments have the same number of files/timepoints
+        file_count = self.experiments[0].get_file_count()
+        n_timepoints = self.experiments[0].get_file_time_points()
+
+        ITs = np.empty((n_experiments, n_timepoints), dtype=float)
+        for i, experiment in enumerate(self.experiments):
+            first_file = experiment.get_spheroid_file(0)
+            IT_individual = first_file.get_original_data_IT()
+            ITs[i, :] = IT_individual
+        
+        return ITs
+
     def average_IT_over_replicates(self):
         """
         This method gets the IT profiles of all experiments of all files
@@ -61,16 +83,14 @@ class GroupAnalysis:
 
         # Assume all experiments have the same number of files/timepoints
         file_count = self.experiments[0].get_file_count()
-        print('Number of files {file_count}')
         n_timepoints = self.experiments[0].get_file_time_points()
-        print('Number of timepoints {n_timepoints}')
 
         all_ITs = np.empty((file_count, n_timepoints, n_experiments), dtype=float) 
         # 16 x 600 x 4 (n_experiments x n_timepoints x n_replicates)
         # Then do the average over the replicates
         for i, experiment in enumerate(self.experiments):
             for j, spheroid_file in enumerate(experiment.files):
-                print(spheroid_file.get_filepath())
+                #print(spheroid_file.get_filepath())
                 IT_individual = spheroid_file.get_processed_data_IT()
                 all_ITs[j, :, i] = IT_individual
         # Average over the third dimension (replicates)
@@ -282,6 +302,20 @@ class GroupAnalysis:
         plt.tight_layout()
         plt.show()
 
+    def plot_unprocessed_first_ITs(self):
+        import matplotlib.pyplot as plt
+        first_ITs = self.non_normalized_first_ITs()
+        # Number of replicates (rows in mean_ITs)
+        n_files = first_ITs.shape[0]
+        # Time points (columns in mean_ITs)
+        time_points = np.arange(first_ITs.shape[1])
+        for i in range(n_files):
+            plt.plot(time_points, first_ITs[i,:], label=f"Replicate {i+1}", color="blue", alpha=0.7)
+        plt.title("Unprocessed First ITs of Replicates")
+        plt.legend(fontsize=10, loc="upper right")
+        plt.grid(False)
+        plt.tight_layout()
+        plt.show()
 
 if __name__ == "__main__":
     import time
@@ -318,6 +352,7 @@ if __name__ == "__main__":
     print("--- %s seconds ---" % (time.time() - start_time))
 
     group_analysis.plot_mean_ITs()
+    group_analysis.plot_unprocessed_first_ITs()
     group_analysis.plot_mean_amplitudes_over_time()
     group_analysis.plot_all_amplitudes_over_time()
 

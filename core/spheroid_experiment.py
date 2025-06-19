@@ -61,8 +61,8 @@ class SpheroidExperiment:
         if processors is None:
             self.processors = [
                 BackgroundSubtraction(region=(0, 10)),
-                # ButterworthFilter(),
-                SavitzkyGolayFilter(w=20, p=2),
+                ButterworthFilter(),
+                #SavitzkyGolayFilter(w=20, p=2),
                 BaselineCorrection(),
                 Normalize(self.peak_position),
                 FindAmplitude(self.peak_position),
