@@ -34,8 +34,8 @@ class SpheroidExperiment:
     def __init__(
         self,
         filepaths,
-        file_length=60,
-        acquisition_frequency=10,
+        file_length=60, # Default file length in seconds
+        acquisition_frequency=10, 
         peak_position=257,
         treatment="",
         waveform="",  # Added waveform parameter
@@ -61,13 +61,14 @@ class SpheroidExperiment:
         if processors is None:
             self.processors = [
                 BackgroundSubtraction(region=(0, 10)),
-                ButterworthFilter(),
+                # ButterworthFilter(),
+                SavitzkyGolayFilter(w=20, p=2),
                 BaselineCorrection(),
-                #Normalize(self.peak_position),
+                Normalize(self.peak_position),
                 FindAmplitude(self.peak_position),
                 ExponentialFitting(),
                 #BackgroundSubtraction(region=(0, 10)),
-                #SavitzkyGolayFilter(w=20, p=2),
+                #,
                 #ButterworthFilter(),
                 #No need to pass context here
             ]
@@ -95,6 +96,15 @@ class SpheroidExperiment:
 
     def get_file_count(self):
         return len(self.files)
+    
+    def get_file_length(self):
+        return self.file_length
+    
+    def get_acquisition_frequency(self):
+        return self.acquisition_frequency
+    
+    def get_file_time_points(self):
+        return self.file_length * self.acquisition_frequency
     
     def get_number_of_files_before_treatment(self):
         return self.files_before_treatment
@@ -140,8 +150,8 @@ class SpheroidExperiment:
 
 
 if __name__ == "__main__":
-    folder = r"C:\Users\pablo\OneDrive\Documentos\1st_Year_PhD\Projects\NeuroStemVolt\data\241111_batch1_n1_Sert"
-    #folder = r"/Users/pabloprieto/Library/CloudStorage/OneDrive-Personal/Documentos/1st_Year_PhD/Projects/NeuroStemVolt/data/241111_batch1_n1_Sert"
+    #folder = r"C:\Users\pablo\OneDrive\Documentos\1st_Year_PhD\Projects\NeuroStemVolt\data\241111_batch1_n1_Sert"
+    folder = r"/Users/pabloprieto/Library/CloudStorage/OneDrive-Personal/Documentos/1st_Year_PhD/Projects/NeuroStemVolt/data/241111_batch1_n1_Sert"
     filepaths = [os.path.join(folder, f) for f in os.listdir(folder) if f.endswith('.txt')]
 
     experiment = SpheroidExperiment(filepaths, treatment="Sertraline", waveform = "5HT")
