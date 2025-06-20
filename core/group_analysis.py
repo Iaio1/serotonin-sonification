@@ -168,7 +168,7 @@ class GroupAnalysis:
 
         return time_points, mean_amplitudes, all_amplitudes, files_before_treatment
     
-    def exponential_fitting_replicated(self, replicate_time_point = 0):
+    def exponential_fitting_replicated(self, replicate_time_point = 0, global_peak_amplitude_position=None):
         """
         This function implements an exponential fitting curve over the replicates 
         at specific replicated time points. (e.g. 10min treatment file)
@@ -202,7 +202,10 @@ class GroupAnalysis:
 
         print(peak_amplitude_positions)
         latest_peak_amplitude_positions = np.max(peak_amplitude_positions)
-        global_peak_amplitude_position = latest_peak_amplitude_positions
+        if global_peak_amplitude_position is None:
+            global_peak_amplitude_position = latest_peak_amplitude_positions
+        else:
+            global_peak_amplitude_position = int(global_peak_amplitude_position)
         print(global_peak_amplitude_position)
         cropped_ITs = all_ITs[:, global_peak_amplitude_position:]
 
@@ -244,7 +247,7 @@ class GroupAnalysis:
 
         return time_all, ITs_flattened, t_half, popt, pcov,  A_fit, tau_fit, C_fit
 
-    def plot_exponential_fit_with_CI(self, replicate_time_point=0):
+    def plot_exponential_fit_with_CI(self, replicate_time_point=0, global_peak_position=None):
         import matplotlib.pyplot as plt
         from scipy.stats import t
         import numpy as np
@@ -273,7 +276,10 @@ class GroupAnalysis:
             all_ITs[i, :] = IT_individual
 
         global_peak_position = int(np.max(peak_positions))
-
+        if global_peak_position is None:
+            global_peak_position = int(np.max(peak_positions))
+        else:
+            global_peak_position = global_peak_position
         # Time array for full profile
         full_time = np.arange(n_timepoints)
 
