@@ -201,7 +201,8 @@ class GroupAnalysis:
             all_ITs[i, :] = IT_individual
 
         print(peak_amplitude_positions)
-        global_peak_amplitude_position = int(np.mean(peak_amplitude_positions))
+        latest_peak_amplitude_positions = np.max(peak_amplitude_positions)
+        global_peak_amplitude_position = latest_peak_amplitude_positions
         print(global_peak_amplitude_position)
         cropped_ITs = all_ITs[:, global_peak_amplitude_position:]
 
