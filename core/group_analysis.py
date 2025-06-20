@@ -272,7 +272,7 @@ class GroupAnalysis:
             peak_positions.append(peak_pos)
             all_ITs[i, :] = IT_individual
 
-        global_peak_position = int(np.mean(peak_positions))
+        global_peak_position = int(np.max(peak_positions))
 
         # Time array for full profile
         full_time = np.arange(n_timepoints)
@@ -309,8 +309,16 @@ class GroupAnalysis:
         plt.axvline(global_peak_position, color='orange', linestyle='--', label=f"Peak @ {global_peak_position}")
         plt.axvline(global_peak_position + int(t_half), color='purple', linestyle=':', label=f"t_half ≈ {t_half:.2f}")
 
+        # Plot peak positions of each replicate
+        for i, peak_pos in enumerate(peak_positions):
+            if isinstance(peak_pos, (np.ndarray, list)) and len(peak_pos) > 0:
+                pos = int(np.max(peak_pos))
+            else:
+                pos = int(peak_pos)
+            plt.scatter(pos, all_ITs[i, pos], color='red', marker='x', s=10, label='Peak Position' if i == 0 else None, zorder=5)
+
         plt.xlabel("Time Points (seconds)")
-        print("File duration:",file_duration)
+        print("File duration:", file_duration)
         # Set ticks at every 10 seconds => every 100 time points
         tick_locs = np.arange(0, 601, 100)       # 0, 100, 200, ..., 600
         tick_labels = [str(int(x / 10)) for x in tick_locs]  # convert to seconds: 0, 10, ..., 60
