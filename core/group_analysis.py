@@ -1,4 +1,5 @@
 from spheroid_experiment import SpheroidExperiment
+from processing.exponentialdecay import exp_decay
 import os
 import numpy as np
 
@@ -63,6 +64,7 @@ class GroupAnalysis:
         n_timepoints = self.experiments[0].get_file_time_points()
 
         ITs = np.empty((n_experiments, n_timepoints), dtype=float)
+
         for i, experiment in enumerate(self.experiments):
             first_file = experiment.get_spheroid_file(0)
             IT_individual = first_file.get_original_data_IT()
@@ -166,6 +168,160 @@ class GroupAnalysis:
 
         return time_points, mean_amplitudes, all_amplitudes, files_before_treatment
     
+    def exponential_fitting_replicated(self, replicate_time_point = 0):
+        """
+        This function implements an exponential fitting curve over the replicates 
+        at specific replicated time points. (e.g. 10min treatment file)
+        Input:
+        - replicate_time_point is the index to gather the data from. 
+        (e.g. if files are collected every 10 min, and there are three files pre-treatment
+          index -3 will be the first file before treatment, index 3 will be the first file after treatment)
+        returns 
+        """
+
+        from scipy.optimize import curve_fit
+        
+        n_experiments = len(self.experiments)
+        if n_experiments == 0:
+            return None, None, None, None
+
+        # Assume all experiments have the same number of files/timepoints
+        n_timepoints = self.experiments[0].get_file_time_points()
+        files_before_treatment = self.experiments[0].get_number_of_files_before_treatment() # This will be zero if no files before treatment
+        
+        all_ITs = np.empty((n_experiments, n_timepoints))
+        peak_amplitude_positions = []
+
+        actual_index = replicate_time_point + files_before_treatment
+        for i, experiment in enumerate(self.experiments):
+            file = experiment.get_spheroid_file(actual_index)
+            IT_individual = file.get_processed_data_IT()
+            metadata = file.get_metadata()
+            peak_amplitude_positions.append(metadata["peak_amplitude_positions"])
+            all_ITs[i, :] = IT_individual
+
+        print(peak_amplitude_positions)
+        latest_peak_amplitude_positions = np.max(peak_amplitude_positions)
+        global_peak_amplitude_position = latest_peak_amplitude_positions
+        print(global_peak_amplitude_position)
+        cropped_ITs = all_ITs[:, global_peak_amplitude_position:]
+
+        ITs_flattened = cropped_ITs.flatten()
+        n_cropped_timepoints = np.shape(cropped_ITs)
+
+        A = np.arange(global_peak_amplitude_position, n_timepoints)
+        time_all = np.tile(A, n_experiments)  # Repeat time point
+
+        #print("Len ITs Flattened:", len(ITs_flattened))
+        #print("ITs_Flattened", np.shape(ITs_flattened))
+        #print("Time All", np.shape(time_all))
+
+        # Improved initial guess for parameters
+        # A: amplitude (difference between max and min of cropped ITs)
+        # tau: decay constant (guess as 1/3 of the time range)
+        # C: baseline (last value of the mean trace)
+        mean_trace = np.mean(cropped_ITs, axis=0)
+        A0 = float(np.max(mean_trace) - np.min(mean_trace))
+        tau0 = (n_timepoints - global_peak_amplitude_position) / 3.0
+        C0 = float(mean_trace[-1])
+        p0 = [A0, tau0, C0]
+
+        print(f"Initial guess: A={A0:.2f}, tau={tau0:.2f}, C={C0:.2f}")
+
+        # Fit
+        popt, pcov = curve_fit(exp_decay, time_all, ITs_flattened, p0=p0)
+
+        # Extract parameter estimates and standard errors
+        A_fit, tau_fit, C_fit = popt
+        perr = np.sqrt(np.diag(pcov))  # Approximate symmetric 1-sigma CI
+
+        print(f"Fit results:")
+        print(f"A   = {A_fit:.2f} ± {perr[0]:.2f}")
+        print(f"tau = {tau_fit:.2f} ± {perr[1]:.2f}")
+        print(f"C   = {C_fit:.2f} ± {perr[2]:.2f}")
+
+        t_half = np.log(2) * tau_fit
+
+        return time_all, ITs_flattened, t_half, popt, pcov,  A_fit, tau_fit, C_fit
+
+    def plot_exponential_fit_with_CI(self, replicate_time_point=0):
+        import matplotlib.pyplot as plt
+        from scipy.stats import t
+        import numpy as np
+
+        # Run the fitting function to get values and data
+        time_all, ITs_flattened, t_half, popt, pcov, A_fit, tau_fit, C_fit = self.exponential_fitting_replicated(replicate_time_point=replicate_time_point)
+        A_fit, tau_fit, C_fit = popt
+        perr = np.sqrt(np.diag(pcov))  # 1-sigma CI
+
+        # Retrieve full ITs and metadata again for plotting individual traces
+        n_experiments = len(self.experiments)
+        file_duration = self.experiments[0].get_file_length()
+        n_timepoints = self.experiments[0].get_file_time_points()
+        files_before_treatment = self.experiments[0].get_number_of_files_before_treatment()
+        actual_index = replicate_time_point + files_before_treatment
+
+        all_ITs = np.empty((n_experiments, n_timepoints))
+        peak_positions = []
+
+        for i, experiment in enumerate(self.experiments):
+            file = experiment.get_spheroid_file(actual_index)
+            IT_individual = file.get_processed_data_IT()
+            metadata = file.get_metadata()
+            peak_pos = metadata.get("peak_amplitude_positions")
+            peak_positions.append(peak_pos)
+            all_ITs[i, :] = IT_individual
+
+        global_peak_position = int(np.mean(peak_positions))
+
+        # Time array for full profile
+        full_time = np.arange(n_timepoints)
+
+        # Time for fitting and prediction
+        t_fit = np.linspace(global_peak_position, n_timepoints - 1, 500)
+        y_fit = A_fit * np.exp(-t_fit / tau_fit) + C_fit
+
+        # 95% CI using Jacobian
+        dof = max(0, len(time_all) - len(popt))
+        t_val = t.ppf(0.975, dof)
+
+        J = np.empty((len(t_fit), 3))
+        J[:, 0] = np.exp(-t_fit / tau_fit)
+        J[:, 1] = A_fit * t_fit / tau_fit**2 * np.exp(-t_fit / tau_fit)
+        J[:, 2] = 1
+
+        ci = np.sqrt(np.sum((J @ pcov) * J, axis=1)) * t_val
+        y_lower = y_fit - ci
+        y_upper = y_fit + ci
+
+        # Plot
+        plt.figure(figsize=(10, 6))
+
+        # Plot each replicate I-T trace
+        for i in range(n_experiments):
+            plt.plot(full_time, all_ITs[i, :], alpha=0.4, linewidth=1, label=f"Replicate {i+1}" if i == 0 else None)
+
+        # Plot fit and CI
+        plt.plot(t_fit, y_fit, label='Exponential Fit', color='red', linewidth=2)
+        plt.fill_between(t_fit, y_lower, y_upper, color='red', alpha=0.3, label='95% CI')
+
+        # Mark peak and t_half
+        plt.axvline(global_peak_position, color='orange', linestyle='--', label=f"Peak @ {global_peak_position}")
+        plt.axvline(global_peak_position + int(t_half), color='purple', linestyle=':', label=f"t_half ≈ {t_half:.2f}")
+
+        plt.xlabel("Time Points (seconds)")
+        print("File duration:",file_duration)
+        # Set ticks at every 10 seconds => every 100 time points
+        tick_locs = np.arange(0, 601, 100)       # 0, 100, 200, ..., 600
+        tick_labels = [str(int(x / 10)) for x in tick_locs]  # convert to seconds: 0, 10, ..., 60
+        plt.xticks(tick_locs, tick_labels, fontsize=10)
+        plt.ylabel("Current (nA)")
+        plt.title("Replicate I-T Profiles with Exponential Fit & CI")
+        plt.legend()
+        plt.grid(False)
+        plt.tight_layout()
+        plt.show()
+
     def plot_amplitudes_over_time_single_experiment(self, experiment_index=0):
         """
         Plot the amplitudes of a single experiment over time, with treatment point clearly marked.
@@ -335,7 +491,7 @@ class GroupAnalysis:
         # Show the plot
         plt.tight_layout()
         plt.show()
-        
+    
 
 if __name__ == "__main__":
     import time
@@ -371,8 +527,10 @@ if __name__ == "__main__":
     time.time()
     print("--- %s seconds ---" % (time.time() - start_time))
 
-    group_analysis.plot_mean_ITs()
-    group_analysis.plot_unprocessed_first_ITs()
-    group_analysis.plot_mean_amplitudes_over_time()
-    group_analysis.plot_all_amplitudes_over_time()
+    #group_analysis.plot_mean_ITs()
+    group_analysis.exponential_fitting_replicated()
+    group_analysis.plot_exponential_fit_with_CI(replicate_time_point=1)
+    #group_analysis.plot_unprocessed_first_ITs()
+    #group_analysis.plot_mean_amplitudes_over_time()
+    #group_analysis.plot_all_amplitudes_over_time()
 
