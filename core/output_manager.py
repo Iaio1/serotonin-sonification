@@ -25,9 +25,15 @@ class OutputManager:
             df.columns = [f"File_{i}" for i in range(len(file_names))]
             df.columns = [file_name.split("/")[-1] for file_name in file_names]
             output_csv = "All_ITs_experiment_n{0}.csv".format(i)
-            output_path = os.path.join(output_folder_path, output_csv)
-            print(output_path)
+            output_IT_folder = os.path.join(output_folder_path,"replicate_ITs")
+            if os.path.isdir(output_IT_folder) == False:
+                os.mkdir(output_IT_folder)
+            output_path = os.path.join(output_IT_folder, output_csv)
             df.to_csv(output_path, index_label="TimePoint")
+    @staticmethod
+    def save_metadata_metrics(group_experiments : GroupAnalysis, output_folder_path):
+        pass
+
 
 
 if __name__ == "__main__":
