@@ -9,7 +9,6 @@ from processing.find_amplitude import FindAmplitude
 from processing.normalize import Normalize
 from processing.sav_gol import SavitzkyGolayFilter
 from processing.background_subtraction import BackgroundSubtraction
-from output_manager import OutputManager
 from processing.exponentialdecay import ExponentialFitting
 from utils import extract_timepoint
 import os
