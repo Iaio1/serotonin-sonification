@@ -129,6 +129,44 @@ class OutputManager:
                     os.mkdir(output_IT_folder)
                 output_path = os.path.join(output_IT_folder, output_csv)
                 df.to_csv(output_path, index_label="File Number")
+    @staticmethod
+    def save_all_peak_amplitudes(group_experiments : GroupAnalysis, output_folder_path):
+        keys = ['peak_amplitude_values']
+
+        experiments = group_experiments.get_experiments()
+        n_experiments = len(experiments)
+        n_files = experiments[0].get_file_count()
+        n_before = experiments[0].get_number_of_files_before_treatment()
+        interval = experiments[0].get_time_between_files()  # e.g., 10
+
+        if n_experiments == 0:
+            return None
+        # Initialise the time axis (first column)
+        if n_before > 0:
+            time_points = [interval * (i - n_before) for i in range(n_files)]
+        else:
+            time_points = [i * interval for i in range(n_files)]
+
+        all_amplitudes = []
+        for i, experiment in enumerate(group_experiments.get_experiments()):
+            records = []
+            for j, spheroid_file in enumerate(experiment.files):
+                meta = spheroid_file.get_metadata()
+                # Save only selected keys
+                records.append(meta.get(keys[0], None) if keys else meta)
+            all_amplitudes.append(records)
+        
+        # Build DataFrame
+        df = pd.DataFrame(all_amplitudes).T  # shape: (n_files, n_experiments)
+        df.columns = [f"Rep{idx+1}" for idx in range(n_experiments)]
+        df.insert(0, "Time", time_points)
+
+        # Save to CSV
+        output_folder = os.path.join(output_folder_path, "all_replicates_amplitudes")
+        os.makedirs(output_folder, exist_ok=True)
+        output_path = os.path.join(output_folder, "All_amplitudes_all_replicates.csv")
+        df.to_csv(output_path, index=False)
+        print(f"Saved all amplitudes for all replicates to {output_path}")
 
 
 if __name__ == "__main__":
@@ -151,6 +189,7 @@ if __name__ == "__main__":
     # Save ITs
     output_folder = r"/Users/pabloprieto/Library/CloudStorage/OneDrive-Personal/Documentos/1st_Year_PhD/Projects/NeuroStemVolt/output"
     OutputManager.save_all_ITs(group_analysis,output_folder)
+    OutputManager.save_all_peak_amplitudes(group_analysis,output_folder)
     #OutputManager.save_original_ITs(group_analysis,output_folder)
     #OutputManager.save_peak_amplitudes_metrics(group_analysis,output_folder)
 
