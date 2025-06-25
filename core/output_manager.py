@@ -31,6 +31,49 @@ class OutputManager:
             output_path = os.path.join(output_IT_folder, output_csv)
             df.to_csv(output_path, index_label="TimePoint")
     @staticmethod
+    def save_all_ITs(group_experiments : GroupAnalysis, output_folder_path):
+        # This function takes all experiments (after processing) 
+        # and creates output_csv files for all of them
+        experiments = group_experiments.get_experiments()
+        n_experiments = len(group_experiments.get_experiments())
+        n_ITs = group_experiments.get_experiments()[0].get_file_count()
+        n_timepoints = group_experiments.get_experiments()[0].get_file_time_points()
+        if n_experiments == 0:
+            return None
+        # Initialise the matrix
+        arrays = []
+        data = []
+         # For each experiment (replicate)
+        for exp_idx, experiment in enumerate(experiments):
+            rep_name = f"Rep{exp_idx+1}"
+            for file_idx, spheroid_file in enumerate(experiment.files):
+                file_short = os.path.basename(spheroid_file.get_filepath())
+                arrays.append((rep_name, file_short))    
+                
+        for t in range(n_timepoints):
+            row = []
+            for exp_idx, experiment in enumerate(experiments):
+                for file_idx, spheroid_file in enumerate(experiment.files):
+                    IT_individual = spheroid_file.get_processed_data_IT()
+                    if t < len(IT_individual):
+                        row.append(IT_individual[t])
+                    else:
+                        row.append(None)
+            data.append(row)
+
+        # Create MultiIndex columns
+        columns = pd.MultiIndex.from_tuples(arrays, names=["Replicate", "File"])
+        df = pd.DataFrame(data, columns=columns)
+        df.index.name = "TimePoint"
+
+        # Save to CSV
+        output_IT_folder = os.path.join(output_folder_path, "all_replicates_ITs")
+        os.makedirs(output_IT_folder, exist_ok=True)
+        output_path = os.path.join(output_IT_folder, "All_ITs_all_replicates.csv")
+        df.to_csv(output_path)
+        print(f"Saved all ITs for all replicates to {output_path}")
+
+    @staticmethod
     def save_original_ITs(group_experiments : GroupAnalysis, output_folder_path):
         # This function takes all experiments (after processing) 
         # and creates output_csv files for all of them
@@ -107,8 +150,8 @@ if __name__ == "__main__":
 
     # Save ITs
     output_folder = r"/Users/pabloprieto/Library/CloudStorage/OneDrive-Personal/Documentos/1st_Year_PhD/Projects/NeuroStemVolt/output"
-    #OutputManager.save_ITs(group_analysis,output_folder)
-    OutputManager.save_original_ITs(group_analysis,output_folder)
-    OutputManager.save_peak_amplitudes_metrics(group_analysis,output_folder)
+    OutputManager.save_all_ITs(group_analysis,output_folder)
+    #OutputManager.save_original_ITs(group_analysis,output_folder)
+    #OutputManager.save_peak_amplitudes_metrics(group_analysis,output_folder)
 
 
