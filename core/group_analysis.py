@@ -163,15 +163,93 @@ class GroupAnalysis:
                 else:
                     val = float(peak_amplitude_values)
                     all_amplitudes[i, j] = val if val != 0 else 0.0
-
         mean_amplitudes = np.nanmean(all_amplitudes, axis=0)
-
         return time_points, mean_amplitudes, all_amplitudes, files_before_treatment
     
     def exponential_fitting_replicated(self, replicate_time_point = 0, global_peak_amplitude_position=None):
+        from scipy.optimize import curve_fit
+        n_experiments = len(self.experiments)
+        if n_experiments == 0:
+            return None, None, None, None
+        # Assume all experiments have the same number of files/timepoints
+        n_timepoints = self.experiments[0].get_file_time_points()
+        files_before_treatment = self.experiments[0].get_number_of_files_before_treatment() # This will be zero if no files before treatment
+        
+        all_ITs = np.empty((n_experiments, n_timepoints))
+        peak_amplitude_positions = []
+
+        actual_index = replicate_time_point + files_before_treatment
+        for i, experiment in enumerate(self.experiments):
+            file = experiment.get_spheroid_file(actual_index)
+            IT_individual = file.get_processed_data_IT()
+            metadata = file.get_metadata()
+            peak_amplitude_positions.append((metadata["peak_amplitude_positions"]))
+            all_ITs[i, :] = IT_individual
+
+        # Turning peak_amplitude_positions into a list of integers
+        peaks = [p.item() for p in peak_amplitude_positions]
+        min_peak = np.min(peaks)
+        max_peak = np.max(peaks)
+        pre_allocated_ITs_array = np.empty((n_experiments,n_timepoints-min_peak))        
+
+        # Fill the pre-allocated array with the cropped ITs, starting from the peak position
+        for i, (row, peak) in enumerate(zip(all_ITs, peaks)):
+            # Now the array will have from the min peak position to the end of the time points
+            # Now this has aligned the peaks, so the first time point is the peak position for all ITs
+            cropped = row[peak:]
+            length = cropped.shape[0]
+            pre_allocated_ITs_array[i, :length] = cropped
+
+        # Crop the ITs from the end to match data sizes
+        cropped_ITs = pre_allocated_ITs_array[:, :n_timepoints-max_peak-min_peak]
+        print("Cropped ITs:",np.shape(cropped_ITs))
+        ITs_flattened = cropped_ITs.flatten()
+        print(np.shape(ITs_flattened))
+        n_cropped_timepoints = np.shape(cropped_ITs)
+
+        A = np.arange(min_peak, n_timepoints-max_peak)
+        print(np.shape(A))
+        time_all = np.tile(A, n_experiments)  # Repeat time point
+        print(np.shape(time_all))
+
+        #print("Len ITs Flattened:", len(ITs_flattened))
+        #print("ITs_Flattened", np.shape(ITs_flattened))
+        #print("Time All", np.shape(time_all))
+
+        # Improved initial guess for parameters
+        # A: amplitude (difference between max and min of cropped ITs)
+        # tau: decay constant (guess as 1/3 of the time range)
+        # C: baseline (last value of the mean trace)
+        mean_trace = np.mean(cropped_ITs, axis=0)
+        A0 = float(np.max(mean_trace) - np.min(mean_trace))
+        tau0 = (n_timepoints - min_peak) / 3.0
+        C0 = float(mean_trace[-1])
+        p0 = [A0, tau0, C0]
+
+        print(f"Initial guess: A={A0:.2f}, tau={tau0:.2f}, C={C0:.2f}")
+
+        # Fit
+        popt, pcov = curve_fit(exp_decay, time_all, ITs_flattened, p0=p0)
+
+        # Extract parameter estimates and standard errors
+        A_fit, tau_fit, C_fit = popt
+        perr = np.sqrt(np.diag(pcov))  # Approximate symmetric 1-sigma CI
+
+        print(f"Fit results:")
+        print(f"A   = {A_fit:.2f} ± {perr[0]:.2f}")
+        print(f"tau = {tau_fit:.2f} ± {perr[1]:.2f}")
+        print(f"C   = {C_fit:.2f} ± {perr[2]:.2f}")
+
+        t_half = np.log(2) * tau_fit
+
+        # Pre-allocated_ITs_array is the matrix with all data properly aligned on their peaks
+        return time_all, cropped_ITs, t_half, popt, pcov,  A_fit, tau_fit, C_fit
+
+    def exponential_fitting_replicated_legacy(self, replicate_time_point = 0, global_peak_amplitude_position=None):
         """
         This function implements an exponential fitting curve over the replicates 
-        at specific replicated time points. (e.g. 10min treatment file)
+        at specific replicated time points. (e.g. 10min treatment file), this function
+        does it considering the data from the max peak amplitude position. Meaning it does not align the peaks
         Input:
         - replicate_time_point is the index to gather the data from. 
         (e.g. if files are collected every 10 min, and there are three files pre-treatment
@@ -246,8 +324,86 @@ class GroupAnalysis:
         t_half = np.log(2) * tau_fit
 
         return time_all, ITs_flattened, t_half, popt, pcov,  A_fit, tau_fit, C_fit
+    
+    def plot_exponential_fit_aligned(self, replicate_time_point=0):
+        """
+        Plot each post-peak IT trace, the mean decay, the exponential fit, 
+        its 95% CI, and mark the half-life, all on a common “time since peak” axis.
+        """
+        import matplotlib.pyplot as plt
+        from scipy.stats import t
+        import numpy as np
 
-    def plot_exponential_fit_with_CI(self, replicate_time_point=0, global_peak_position=None):
+        # 1) run your fit and get the aligned, cropped IT matrix
+        time_all, cropped_ITs, t_half, popt, pcov, A_fit, tau_fit, C_fit = \
+            self.exponential_fitting_replicated(replicate_time_point)
+        # cropped_ITs: shape (n_experiments, n_post_peak_points)
+
+        # 2) build a “time since peak” axis
+        n_exps, n_post = cropped_ITs.shape
+        t_rel = np.arange(n_post)
+
+        # 3) compute mean ± SD across replicates
+        mean_IT = np.nanmean(cropped_ITs, axis=0)
+        std_IT  = np.nanstd (cropped_ITs, axis=0)
+
+        # 4) smooth fit curve on that same relative axis
+        t_fit_rel = np.linspace(0, n_post-1, 500)
+        y_fit     = A_fit * np.exp(-t_fit_rel / tau_fit) + C_fit
+
+        # 5) 95% CI of the fit via Jacobian
+        dof  = max(0, len(time_all) - len(popt))
+        tval = t.ppf(0.975, dof)
+        # Jacobian of f(t) = A e^{-t/τ} + C wrt [A, τ, C]
+        J        = np.empty((len(t_fit_rel), 3))
+        J[:, 0]  = np.exp(-t_fit_rel / tau_fit)
+        J[:, 1]  = A_fit * (t_fit_rel / tau_fit**2) * np.exp(-t_fit_rel / tau_fit)
+        J[:, 2]  = 1
+        ci       = np.sqrt(np.sum((J @ pcov) * J, axis=1)) * tval
+        lower_ci = y_fit - ci
+        upper_ci = y_fit + ci
+
+        # 6) start plotting
+        plt.figure(figsize=(10,6))
+
+        # a) each replicate in light gray
+        for row in cropped_ITs:
+            plt.plot(t_rel, row, color='gray', alpha=0.3, lw=1, label='_nolegend_')
+
+        # b) mean ± 1 SD ribbon
+        plt.fill_between(t_rel,
+                        mean_IT - std_IT,
+                        mean_IT + std_IT,
+                        color='C0', alpha=0.2,
+                        label='Mean ± 1 SD')
+
+        # c) mean trace
+        plt.plot(t_rel, mean_IT, color='C0', lw=2, label='Mean trace')
+
+        # d) fitted exponential curve
+        plt.plot(t_fit_rel, y_fit, color='C1', lw=2, label='Exp fit')
+
+        # e) 95% CI around the fit
+        plt.fill_between(t_fit_rel,
+                        lower_ci,
+                        upper_ci,
+                        color='C1', alpha=0.3,
+                        label='95% CI')
+
+        # f) half-life marker
+        plt.axvline(t_half, color='magenta', ls='--',
+                    label=f't½ ≈ {t_half:.1f} pts')
+
+        # 7) labels & styling
+        plt.xlabel('Time since peak (points)', fontsize=12)
+        plt.ylabel('Current (nA)', fontsize=12)
+        plt.title('Post-peak IT decays & exponential fit', fontsize=14)
+        plt.legend(frameon=False)
+        plt.grid(False)
+        plt.tight_layout()
+        plt.show()
+
+    def plot_exponential_fit_with_CI_legacy(self, replicate_time_point=0, global_peak_position=None):
         import matplotlib.pyplot as plt
         from scipy.stats import t
         import numpy as np
@@ -543,7 +699,7 @@ if __name__ == "__main__":
 
     #group_analysis.plot_mean_ITs()
     group_analysis.exponential_fitting_replicated()
-    group_analysis.plot_exponential_fit_with_CI(replicate_time_point=1)
+    group_analysis.plot_exponential_fit_aligned(replicate_time_point=0)
     #group_analysis.plot_unprocessed_first_ITs()
     #group_analysis.plot_mean_amplitudes_over_time()
     #group_analysis.plot_all_amplitudes_over_time()
