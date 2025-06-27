@@ -1,5 +1,6 @@
 from spheroid_experiment import SpheroidExperiment
 from processing.exponentialdecay import exp_decay
+from processing.normalize import Normalize
 import os
 import numpy as np
 
@@ -100,7 +101,37 @@ class GroupAnalysis:
         print(np.shape(mean_ITs))
         
         return mean_ITs
-            
+    
+    def amplitudes_first_stim(self):
+        """
+        Get the unnormalised amplitudes of all experiments over time.
+        :return: List of lists containing amplitudes for each experiment.
+        """
+        n_experiments = len(self.experiments)
+        if n_experiments == 0:
+            return None, None, None, None
+
+        # Assume all experiments have the same number of files/timepoints
+        n_timepoints = self.experiments[0].get_file_count()
+        files_before_treatment = self.experiments[0].get_number_of_files_before_treatment() # This will be zero if no files before treatment
+        time_points = np.linspace(
+            0,
+            self.experiments[0].get_time_between_files() * (n_timepoints - 1),
+            n_timepoints
+        )
+        amplitudes = []
+        for i, experiment in enumerate(self.experiments):
+            first_stim_spheroid = experiment.get_spheroid_file(0) #Getting the first stimulation
+            # print(first_stim_spheroid.get_filepath()) 
+            # Check for Normalize in the processor list
+            has_norm = any(isinstance(p, Normalize) for p in experiment.processors)
+            if has_norm:
+                raise RuntimeError("Experiment must not include Normalize()")
+            metadata = first_stim_spheroid.get_metadata()
+            peak_amplitude_values = metadata['peak_amplitude_values']
+            amplitudes.append(peak_amplitude_values.tolist())
+
+        return amplitudes
 
     def amplitudes_over_time_single_experiment(self, experiment_index=0):
         """
@@ -542,9 +573,10 @@ if __name__ == "__main__":
     print("--- %s seconds ---" % (time.time() - start_time))
 
     #group_analysis.plot_mean_ITs()
-    group_analysis.exponential_fitting_replicated()
-    group_analysis.plot_exponential_fit_with_CI(replicate_time_point=1)
+    #group_analysis.exponential_fitting_replicated()
+    #group_analysis.plot_exponential_fit_with_CI(replicate_time_point=1)
     #group_analysis.plot_unprocessed_first_ITs()
     #group_analysis.plot_mean_amplitudes_over_time()
     #group_analysis.plot_all_amplitudes_over_time()
+    group_analysis.amplitudes_first_stim()
 
