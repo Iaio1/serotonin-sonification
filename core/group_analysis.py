@@ -275,7 +275,26 @@ class GroupAnalysis:
 
         # Pre-allocated_ITs_array is the matrix with all data properly aligned on their peaks
         return time_all, cropped_ITs, t_half, popt, pcov,  A_fit, tau_fit, C_fit
-
+    
+    def get_tau_over_time(self):
+        """
+        Runs exponential_fitting_replicated for each replicate time point,
+        collects tau and its error, and returns them as lists.
+        """
+        n_files = self.experiments[0].get_file_count()
+        tau_list = []
+        tau_err_list = []
+        for t in range(n_files):
+            try:
+                _, _, _, popt, pcov, _, tau_fit, _ = self.exponential_fitting_replicated(replicate_time_point=t)
+                tau_list.append(tau_fit)
+                tau_err = np.sqrt(np.diag(pcov))[1] if pcov is not None else np.nan
+                tau_err_list.append(tau_err)
+            except Exception as e:
+                tau_list.append(np.nan)
+                tau_err_list.append(np.nan)
+        return tau_list, tau_err_list
+    
     def exponential_fitting_replicated_legacy(self, replicate_time_point = 0, global_peak_amplitude_position=None):
         """
         This function implements an exponential fitting curve over the replicates 
@@ -355,7 +374,7 @@ class GroupAnalysis:
         t_half = np.log(2) * tau_fit
 
         return time_all, ITs_flattened, t_half, popt, pcov,  A_fit, tau_fit, C_fit
-    
+
     def plot_exponential_fit_aligned(self, replicate_time_point=0):
         """
         Plot each post-peak IT trace, the mean decay, the exponential fit, 
@@ -431,6 +450,30 @@ class GroupAnalysis:
         plt.title('Post-peak IT decays & exponential fit', fontsize=14)
         plt.legend(frameon=False)
         plt.grid(False)
+        plt.tight_layout()
+        plt.show()
+    
+    def plot_tau_over_time(self):
+        """
+        Plots the exponential decay parameter tau over replicate time points.
+        """
+        import matplotlib.pyplot as plt
+
+        tau_list, tau_err_list = self.get_tau_over_time()
+        n_files = self.experiments[0].get_file_count()
+        time_points = np.linspace(
+            0,
+            self.experiments[0].get_time_between_files() * (n_files - 1),
+            n_files
+        )
+
+        plt.figure(figsize=(10, 6))
+        plt.errorbar(time_points, tau_list, yerr=tau_err_list, fmt='o-', capsize=4, color='C1', label='Tau (decay constant)')
+        plt.xlabel("Time (minutes)")
+        plt.ylabel("Tau (decay constant)")
+        plt.title("Exponential Decay Tau Over Time Points")
+        plt.grid(True)
+        plt.legend()
         plt.tight_layout()
         plt.show()
 
@@ -770,6 +813,7 @@ if __name__ == "__main__":
     #group_analysis.plot_unprocessed_first_ITs()
     #group_analysis.plot_mean_amplitudes_over_time()
     #group_analysis.plot_all_amplitudes_over_time()
-    group_analysis.amplitudes_first_stim()
-    group_analysis.plot_first_stim_amplitudes()
+    #group_analysis.amplitudes_first_stim()
+    #group_analysis.plot_first_stim_amplitudes()
+    group_analysis.plot_tau_over_time()
 
