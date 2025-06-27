@@ -221,8 +221,7 @@ class GroupAnalysis:
         peaks = [p.item() for p in peak_amplitude_positions]
         min_peak = np.min(peaks)
         max_peak = np.max(peaks)
-        pre_allocated_ITs_array = np.empty((n_experiments,n_timepoints-min_peak))        
-
+        pre_allocated_ITs_array = np.full((n_experiments, n_timepoints - min_peak), np.nan)       
         # Fill the pre-allocated array with the cropped ITs, starting from the peak position
         for i, (row, peak) in enumerate(zip(all_ITs, peaks)):
             # Now the array will have from the min peak position to the end of the time points
@@ -274,7 +273,7 @@ class GroupAnalysis:
         t_half = np.log(2) * tau_fit
 
         # Pre-allocated_ITs_array is the matrix with all data properly aligned on their peaks
-        return time_all, cropped_ITs, t_half, popt, pcov,  A_fit, tau_fit, C_fit
+        return time_all, cropped_ITs, pre_allocated_ITs_array, t_half, popt, pcov,  A_fit, tau_fit, C_fit
     
     def get_tau_over_time(self):
         """
@@ -286,7 +285,7 @@ class GroupAnalysis:
         tau_err_list = []
         for t in range(n_files):
             try:
-                _, _, _, popt, pcov, _, tau_fit, _ = self.exponential_fitting_replicated(replicate_time_point=t)
+                _, _, _, _, popt, pcov, _, tau_fit, _ = self.exponential_fitting_replicated(replicate_time_point=t)
                 tau_list.append(tau_fit)
                 tau_err = np.sqrt(np.diag(pcov))[1] if pcov is not None else np.nan
                 tau_err_list.append(tau_err)
@@ -385,7 +384,7 @@ class GroupAnalysis:
         import numpy as np
 
         # 1) run your fit and get the aligned, cropped IT matrix
-        time_all, cropped_ITs, t_half, popt, pcov, A_fit, tau_fit, C_fit = \
+        time_all, cropped_ITs, _,t_half, popt, pcov, A_fit, tau_fit, C_fit = \
             self.exponential_fitting_replicated(replicate_time_point)
         # cropped_ITs: shape (n_experiments, n_post_peak_points)
 
@@ -808,7 +807,7 @@ if __name__ == "__main__":
     print("--- %s seconds ---" % (time.time() - start_time))
 
     #group_analysis.plot_mean_ITs()
-    #group_analysis.exponential_fitting_replicated()
+    group_analysis.exponential_fitting_replicated()
     #group_analysis.plot_exponential_fit_aligned(replicate_time_point=0)
     #group_analysis.plot_unprocessed_first_ITs()
     #group_analysis.plot_mean_amplitudes_over_time()
