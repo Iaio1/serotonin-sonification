@@ -456,7 +456,43 @@ class GroupAnalysis:
         plt.xticks(np.arange(0, max(time_points) + 1, 10), fontsize=10)
         plt.tight_layout()
         plt.show()
-    
+
+    def plot_first_stim_amplitudes(self):
+        """
+        Plot the unnormalized amplitudes of the first stimulation for all experiments (replicates).
+        Each replicate is shown as a bar or point, with optional mean and std.
+        """
+        import matplotlib.pyplot as plt
+        import numpy as np
+
+        amplitudes = self.amplitudes_first_stim()  # List of lists (one per replicate)
+        if amplitudes is None or len(amplitudes) == 0:
+            print("No amplitudes to plot.")
+            return
+
+        # Flatten in case each amplitude is a list (e.g., [ [1.2], [1.1], ... ])
+        flat_amps = [a[0] if isinstance(a, (list, np.ndarray)) and len(a) > 0 else np.nan for a in amplitudes]
+        n_replicates = len(flat_amps)
+        x = np.arange(1, n_replicates + 1)
+
+        plt.figure(figsize=(8, 6))
+        plt.bar(x, flat_amps, color='skyblue', edgecolor='k', alpha=0.8, label='First Stimulation Amplitude')
+        plt.scatter(x, flat_amps, color='blue', zorder=5)
+
+        # Mean and std
+        mean_amp = np.nanmean(flat_amps)
+        std_amp = np.nanstd(flat_amps)
+        plt.axhline(mean_amp, color='red', linestyle='--', label=f'Mean = {mean_amp:.2f}')
+        plt.fill_between([0, n_replicates+1], mean_amp-std_amp, mean_amp+std_amp, color='red', alpha=0.15, label='±1 SD')
+
+        plt.xlabel("Replicate", fontsize=14)
+        plt.ylabel("Amplitude (nA)", fontsize=14)
+        plt.title("First Stimulation Amplitudes Across Replicates", fontsize=16)
+        plt.xticks(x, [f"Rep {i}" for i in x])
+        plt.legend()
+        plt.tight_layout()
+        plt.show()
+
     def plot_mean_ITs(self):
         """
         Plots the mean IT profiles over replicates, highlighting files before treatment and marking the first file after treatment.
@@ -579,4 +615,5 @@ if __name__ == "__main__":
     #group_analysis.plot_mean_amplitudes_over_time()
     #group_analysis.plot_all_amplitudes_over_time()
     group_analysis.amplitudes_first_stim()
+    group_analysis.plot_first_stim_amplitudes()
 
