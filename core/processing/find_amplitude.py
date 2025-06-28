@@ -2,6 +2,28 @@ from .base import Processor
 import numpy as np
 from scipy.signal import find_peaks
 
+class FindAmplitudeLegacy(Processor):
+    def __init__(self, peak_position=257):
+        self.peak_position = peak_position
+
+    def process(self, data, context=None):
+        """
+        Usage:
+        Finds the dominant local maxima of the input data and updates the context with their positions and values.
+        """
+        fx = data[:, self.peak_position]
+        peaks, _ = find_peaks(fx, prominence=0.2, distance=10, height=0.1)
+
+        peak_positions = peaks
+        peak_values = fx[peaks]
+
+        # Update context with peak information
+        if context is not None:
+            context['peak_amplitude_positions'] = peak_positions
+            context['peak_amplitude_values'] = peak_values
+        print(f"Found peaks at positions: {peak_positions} with values: {peak_values}")
+        return data
+    
 class FindAmplitude(Processor):
     def __init__(self, peak_position=257):
         self.peak_position = peak_position
