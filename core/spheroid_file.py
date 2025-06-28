@@ -507,10 +507,11 @@ class PLOT_SETTINGS:
 
 if __name__ == "__main__":
     Spheroid_test = SpheroidFile(
-        r"/Users/pabloprieto/Library/CloudStorage/OneDrive-Personal/Documentos/1st_Year_PhD/Projects/NeuroStemVolt/data/241111_batch1_n1_Sert/04_-30_COLOR.txt")
+        r"/Users/pabloprieto/Library/CloudStorage/OneDrive-Personal/Documentos/1st_Year_PhD/Projects/NeuroStemVolt/data/241116_batch1_n3_Sert/20_120_COLOR.txt")
     data = Spheroid_test.get_processed_data()
     print(f"Data shape: {data.shape}")
     # plt.show()
     Spheroid_test.visualize_color_plot_data()
     Spheroid_test.visualize_cv()
+    Spheroid_test.visualize_IT_profile()
     plt.show()

@@ -72,7 +72,45 @@ class GroupAnalysis:
             ITs[i, :] = IT_individual
         
         return ITs
+    
+    def get_all_reuptake_curves(self):
 
+        from scipy.optimize import curve_fit
+        n_experiments = len(self.experiments)
+        if n_experiments == 0:
+            return None, None, None, None
+        # Assume all experiments have the same number of files/timepoints
+        n_timepoints = self.experiments[0].get_file_time_points()
+        files_before_treatment = self.experiments[0].get_number_of_files_before_treatment() # This will be zero if no files before treatment
+        file_count = self.experiments[0].get_file_count()
+
+        all_ITs = np.empty((n_experiments*file_count, n_timepoints))
+        peak_amplitude_positions = []
+        
+        for i, experiment in enumerate(self.experiments):
+            for j, spheroid_file in enumerate(experiment.files):
+                spheroid_file = experiment.get_spheroid_file(j)
+                IT_individual = spheroid_file.get_processed_data_IT()
+                metadata = spheroid_file.get_metadata()
+                peak_amplitude_positions.append((metadata["peak_amplitude_positions"]))
+                all_ITs[i*file_count+j, :] = IT_individual
+
+        # Turning peak_amplitude_positions into a list of integers
+        peaks = [p.item() for p in peak_amplitude_positions]
+        min_peak = np.min(peaks)
+
+        pre_allocated_ITs_array = np.full((n_experiments*file_count, n_timepoints - min_peak), np.nan)       
+        # Fill the pre-allocated array with the cropped ITs, starting from the peak position
+        for i, (row, peak) in enumerate(zip(all_ITs, peaks)):
+            print(i)
+            peak = int(peak)
+            cropped = row[peak:]
+            length = cropped.shape[0]
+            pre_allocated_ITs_array[i, :length] = cropped
+            
+        print(pre_allocated_ITs_array)
+        return pre_allocated_ITs_array
+    
     def average_IT_over_replicates(self):
         """
         This method gets the IT profiles of all experiments of all files
@@ -814,5 +852,6 @@ if __name__ == "__main__":
     #group_analysis.plot_all_amplitudes_over_time()
     #group_analysis.amplitudes_first_stim()
     #group_analysis.plot_first_stim_amplitudes()
-    group_analysis.plot_tau_over_time()
+    #group_analysis.plot_tau_over_time()
+    group_analysis.get_all_reuptake_curves()
 

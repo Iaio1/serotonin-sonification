@@ -150,7 +150,8 @@ class SpheroidExperiment:
 
 if __name__ == "__main__":
     #folder = r"C:\Users\pablo\OneDrive\Documentos\1st_Year_PhD\Projects\NeuroStemVolt\data\241111_batch1_n1_Sert"
-    folder = r"/Users/pabloprieto/Library/CloudStorage/OneDrive-Personal/Documentos/1st_Year_PhD/Projects/NeuroStemVolt/data/241111_batch1_n1_Sert"
+    #folder = r"/Users/pabloprieto/Library/CloudStorage/OneDrive-Personal/Documentos/1st_Year_PhD/Projects/NeuroStemVolt/data/241111_batch1_n1_Sert"
+    folder = r"/Users/pabloprieto/Library/CloudStorage/OneDrive-Personal/Documentos/1st_Year_PhD/Projects/NeuroStemVolt/data/241116_batch1_n3_Sert"
     filepaths = [os.path.join(folder, f) for f in os.listdir(folder) if f.endswith('.txt')]
 
     experiment = SpheroidExperiment(filepaths, treatment="Sertraline", waveform = "5HT")

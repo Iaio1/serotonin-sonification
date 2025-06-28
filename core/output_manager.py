@@ -43,7 +43,7 @@ class OutputManager:
         # Initialise the matrix
         arrays = []
         data = []
-         # For each experiment (replicate)
+        # For each experiment (replicate)
         for exp_idx, experiment in enumerate(experiments):
             rep_name = f"Rep{exp_idx+1}"
             for file_idx, spheroid_file in enumerate(experiment.files):
@@ -168,7 +168,47 @@ class OutputManager:
         df.to_csv(output_path, index=False)
         print(f"Saved all amplitudes for all replicates to {output_path}")
 
+    @staticmethod
+    def save_all_reuptake_curves(group_experiments : GroupAnalysis, output_folder_path):
+        """
+        Save the aligned reuptake curves (pre_allocated_ITs_array) for all replicates to a CSV.
+        Each column is a replicate, each row is a time point after peak alignment.
+        """
 
+        # This function takes all experiments (after processing) 
+        # and creates output_csv files for all of them
+        experiments = group_experiments.get_experiments()
+        n_experiments = len(group_experiments.get_experiments())
+        n_ITs = group_experiments.get_experiments()[0].get_file_count()
+        n_timepoints = group_experiments.get_experiments()[0].get_file_time_points()
+        if n_experiments == 0:
+            return None
+        
+        curves = group_experiments.get_all_reuptake_curves()
+        curves_aligned = curves.T #Our structure of the matrix is like save_all_ITs
+
+        # Initialise the matrix
+        arrays = []
+        data = []
+        # For each experiment (replicate)
+        for exp_idx, experiment in enumerate(experiments):
+            rep_name = f"Rep{exp_idx+1}"
+            for file_idx, spheroid_file in enumerate(experiment.files):
+                file_short = os.path.basename(spheroid_file.get_filepath())
+                arrays.append((rep_name, file_short))    
+
+        # Create MultiIndex columns
+        columns = pd.MultiIndex.from_tuples(arrays, names=["Replicate", "File"])
+        df = pd.DataFrame(curves_aligned, columns=columns)
+        df.index.name = "TimePoint"
+
+        # Save to CSV
+        output_IT_folder = os.path.join(output_folder_path, "all_reuptakes")
+        os.makedirs(output_IT_folder, exist_ok=True)
+        output_path = os.path.join(output_IT_folder, "All_reuptakes.csv")
+        df.to_csv(output_path)
+        print(f"Saved all reuptakes for all replicates to {output_path}")
+        
 if __name__ == "__main__":
     # Example usage
     folder_first_experiment = r"/Users/pabloprieto/Library/CloudStorage/OneDrive-Personal/Documentos/1st_Year_PhD/Projects/NeuroStemVolt/data/241111_batch1_n1_Sert"
@@ -192,5 +232,6 @@ if __name__ == "__main__":
     OutputManager.save_all_peak_amplitudes(group_analysis,output_folder)
     #OutputManager.save_original_ITs(group_analysis,output_folder)
     #OutputManager.save_peak_amplitudes_metrics(group_analysis,output_folder)
+    OutputManager.save_all_reuptake_curves(group_analysis,output_folder)
 
 
