@@ -110,7 +110,6 @@ class SpheroidFile:
             f"Color Plot{': ' + title_suffix if title_suffix else ''}\nRange: [{vmin:.2f}, {vmax:.2f}] nA")
 
         plt.tight_layout()
-        plt.show()
 
         if save_path:
             plt.savefig(save_path, dpi=300, bbox_inches='tight')
@@ -180,7 +179,7 @@ class SpheroidFile:
         ax.grid(False)
 
         plt.tight_layout()
-        plt.show()
+
         if save_path:
             plt.savefig(save_path, dpi=300, bbox_inches='tight')
             plt.close(fig)
