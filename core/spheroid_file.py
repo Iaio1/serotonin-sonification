@@ -81,7 +81,7 @@ class SpheroidFile:
     def get_metadata(self):
         return self.metadata
 
-    def visualize_color_plot_data(self, title_suffix=""):
+    def visualize_color_plot_data(self, title_suffix="", save_path=None):
         # Initialize plot settings
         plot_settings = PLOT_SETTINGS()
         custom_cmap = plot_settings.custom
@@ -112,9 +112,14 @@ class SpheroidFile:
         plt.tight_layout()
         plt.show()
 
+        if save_path:
+            plt.savefig(save_path, dpi=300, bbox_inches='tight')
+            plt.close(fig)
+        else:
+            plt.show()
         return fig, ax
 
-    def visualize_3d_color_plot(self, title_suffix=""):
+    def visualize_3d_color_plot(self, title_suffix="",save_path=None):
         """
         3D surface with the same orientation as:
         ax.imshow(self.processed_data.T, …)
@@ -176,6 +181,11 @@ class SpheroidFile:
 
         plt.tight_layout()
         plt.show()
+        if save_path:
+            plt.savefig(save_path, dpi=300, bbox_inches='tight')
+            plt.close(fig)
+        else:
+            plt.show()
         return fig, ax
 
     def animate_3d_color_plot(self, title_suffix=""):
@@ -261,7 +271,7 @@ class SpheroidFile:
 
         plt.show()
         
-    def visualize_IT_profile(self):
+    def visualize_IT_profile(self, save_path=None):
         """
         Visualizes the I-T profile at the specified peak position and highlights all detected peaks.
         """
@@ -300,7 +310,12 @@ class SpheroidFile:
         ax.legend()
 
         # Show the plot
-        plt.show()
+        if save_path:
+            plt.savefig(save_path, dpi=300, bbox_inches='tight')
+            plt.close(fig)
+        else:
+            plt.show()
+        return fig, ax
 
     def visualize_IT_with_exponential_decay(self):
         """
