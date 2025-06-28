@@ -247,7 +247,7 @@ class GroupAnalysis:
         all_ITs = np.empty((n_experiments, n_timepoints))
         peak_amplitude_positions = []
 
-        actual_index = replicate_time_point + files_before_treatment
+        actual_index = replicate_time_point
         for i, experiment in enumerate(self.experiments):
             file = experiment.get_spheroid_file(actual_index)
             IT_individual = file.get_processed_data_IT()
@@ -332,6 +332,28 @@ class GroupAnalysis:
                 tau_err_list.append(np.nan)
         return tau_list, tau_err_list
     
+    def get_exponential_fit_params_over_time(self):
+        """
+        Runs exponential_fitting_replicated for each replicate time point,
+        collects A, tau, C and their errors, and returns them as a 2D numpy array.
+        Columns: A_fit, A_error, tau_fit, tau_error, C_fit, C_error
+        Rows: replicate time points
+        """
+        n_files = self.experiments[0].get_file_count() #16 timepoints for our current example
+        results = []
+        for t in range(n_files):
+            try:
+                _, _, _, _, popt, pcov, A_fit, tau_fit, C_fit = self.exponential_fitting_replicated(replicate_time_point=t)
+                if pcov is not None and pcov.shape == (3, 3):
+                    perr = np.sqrt(np.diag(pcov))
+                    A_err, tau_err, C_err = perr[0], perr[1], perr[2]
+                else:
+                    A_err, tau_err, C_err = np.nan, np.nan, np.nan
+                results.append([A_fit, A_err, tau_fit, tau_err, C_fit, C_err])
+            except Exception as e:
+                results.append([np.nan]*6)
+        return np.array(results)
+    
     def exponential_fitting_replicated_legacy(self, replicate_time_point = 0, global_peak_amplitude_position=None):
         """
         This function implements an exponential fitting curve over the replicates 
@@ -340,7 +362,7 @@ class GroupAnalysis:
         Input:
         - replicate_time_point is the index to gather the data from. 
         (e.g. if files are collected every 10 min, and there are three files pre-treatment
-          index -3 will be the first file before treatment, index 3 will be the first file after treatment)
+          index 0 will be the first file before treatment, index 3 will be the first file after treatment)
         returns 
         """
 
@@ -854,4 +876,4 @@ if __name__ == "__main__":
     #group_analysis.plot_first_stim_amplitudes()
     #group_analysis.plot_tau_over_time()
     group_analysis.get_all_reuptake_curves()
-
+    params_matrix = group_analysis.get_exponential_fit_params_over_time()
