@@ -81,7 +81,7 @@ class SpheroidFile:
     def get_metadata(self):
         return self.metadata
 
-    def visualize_color_plot_data(self, title_suffix=""):
+    def visualize_color_plot_data(self, title_suffix="", save_path=None):
         # Initialize plot settings
         plot_settings = PLOT_SETTINGS()
         custom_cmap = plot_settings.custom
@@ -110,11 +110,15 @@ class SpheroidFile:
             f"Color Plot{': ' + title_suffix if title_suffix else ''}\nRange: [{vmin:.2f}, {vmax:.2f}] nA")
 
         plt.tight_layout()
-        plt.show()
 
+        if save_path:
+            plt.savefig(save_path, dpi=300, bbox_inches='tight')
+            plt.close(fig)
+        else:
+            plt.show()
         return fig, ax
 
-    def visualize_3d_color_plot(self, title_suffix=""):
+    def visualize_3d_color_plot(self, title_suffix="",save_path=None):
         """
         3D surface with the same orientation as:
         ax.imshow(self.processed_data.T, …)
@@ -175,7 +179,12 @@ class SpheroidFile:
         ax.grid(False)
 
         plt.tight_layout()
-        plt.show()
+
+        if save_path:
+            plt.savefig(save_path, dpi=300, bbox_inches='tight')
+            plt.close(fig)
+        else:
+            plt.show()
         return fig, ax
 
     def animate_3d_color_plot(self, title_suffix=""):
@@ -261,7 +270,7 @@ class SpheroidFile:
 
         plt.show()
         
-    def visualize_IT_profile(self):
+    def visualize_IT_profile(self, save_path=None):
         """
         Visualizes the I-T profile at the specified peak position and highlights all detected peaks.
         """
@@ -300,7 +309,12 @@ class SpheroidFile:
         ax.legend()
 
         # Show the plot
-        plt.show()
+        if save_path:
+            plt.savefig(save_path, dpi=300, bbox_inches='tight')
+            plt.close(fig)
+        else:
+            plt.show()
+        return fig, ax
 
     def visualize_IT_with_exponential_decay(self):
         """
@@ -507,10 +521,11 @@ class PLOT_SETTINGS:
 
 if __name__ == "__main__":
     Spheroid_test = SpheroidFile(
-        r"/Users/pabloprieto/Library/CloudStorage/OneDrive-Personal/Documentos/1st_Year_PhD/Projects/NeuroStemVolt/data/241111_batch1_n1_Sert/04_-30_COLOR.txt")
+        r"/Users/pabloprieto/Library/CloudStorage/OneDrive-Personal/Documentos/1st_Year_PhD/Projects/NeuroStemVolt/data/241116_batch1_n3_Sert/20_120_COLOR.txt")
     data = Spheroid_test.get_processed_data()
     print(f"Data shape: {data.shape}")
     # plt.show()
     Spheroid_test.visualize_color_plot_data()
     Spheroid_test.visualize_cv()
+    Spheroid_test.visualize_IT_profile()
     plt.show()

@@ -43,7 +43,7 @@ class OutputManager:
         # Initialise the matrix
         arrays = []
         data = []
-         # For each experiment (replicate)
+        # For each experiment (replicate)
         for exp_idx, experiment in enumerate(experiments):
             rep_name = f"Rep{exp_idx+1}"
             for file_idx, spheroid_file in enumerate(experiment.files):
@@ -167,7 +167,148 @@ class OutputManager:
         output_path = os.path.join(output_folder, "All_amplitudes_all_replicates.csv")
         df.to_csv(output_path, index=False)
         print(f"Saved all amplitudes for all replicates to {output_path}")
+    @staticmethod
+    def save_all_reuptake_curves(group_experiments : GroupAnalysis, output_folder_path):
+        """
+        Save the aligned reuptake curves (pre_allocated_ITs_array) for all replicates to a CSV.
+        Each column is a replicate, each row is a time point after peak alignment.
+        """
 
+        # This function takes all experiments (after processing) 
+        # and creates output_csv files for all of them
+        experiments = group_experiments.get_experiments()
+        n_experiments = len(group_experiments.get_experiments())
+        n_ITs = group_experiments.get_experiments()[0].get_file_count()
+        n_timepoints = group_experiments.get_experiments()[0].get_file_time_points()
+        if n_experiments == 0:
+            return None
+        
+        curves = group_experiments.get_all_reuptake_curves()
+        curves_aligned = curves.T #Our structure of the matrix is like save_all_ITs
+
+        # Initialise the matrix
+        arrays = []
+        data = []
+        # For each experiment (replicate)
+        for exp_idx, experiment in enumerate(experiments):
+            rep_name = f"Rep{exp_idx+1}"
+            for file_idx, spheroid_file in enumerate(experiment.files):
+                file_short = os.path.basename(spheroid_file.get_filepath())
+                arrays.append((rep_name, file_short))    
+
+        # Create MultiIndex columns
+        columns = pd.MultiIndex.from_tuples(arrays, names=["Replicate", "File"])
+        df = pd.DataFrame(curves_aligned, columns=columns)
+        df.index.name = "TimePoint"
+
+        # Save to CSV
+        output_IT_folder = os.path.join(output_folder_path, "all_reuptakes")
+        os.makedirs(output_IT_folder, exist_ok=True)
+        output_path = os.path.join(output_IT_folder, "All_reuptakes.csv")
+        df.to_csv(output_path)
+        print(f"Saved all reuptakes for all replicates to {output_path}")
+
+    @staticmethod
+    def save_all_exponential_fitting_params(group_experiments : GroupAnalysis, output_folder_path):
+        
+        params_matrix = group_experiments.get_exponential_fit_params_over_time()
+
+        experiments = group_experiments.get_experiments()
+        n_experiments = len(experiments)
+        n_files = experiments[0].get_file_count()
+        n_before = experiments[0].get_number_of_files_before_treatment()
+        interval = experiments[0].get_time_between_files()  # e.g., 10
+ 
+        if n_experiments == 0:
+            return None
+        # Initialise the time axis (first column)
+        if n_before > 0:
+            time_points = [interval * (i - n_before) for i in range(n_files)]
+        else:
+            time_points = [i * interval for i in range(n_files)]
+        
+        # Build DataFrame
+        df = pd.DataFrame(params_matrix, columns=["A_fit", "A_err", "tau_fit", "tau_err", "C_fit", "C_err"])  
+        df.insert(0, "Time", time_points)
+
+        # Save to CSV
+        output_folder = os.path.join(output_folder_path, "all_exponential_fit_params")
+        os.makedirs(output_folder, exist_ok=True)
+        output_path = os.path.join(output_folder, "all_exp_fit_params.csv")
+        df.to_csv(output_path, index=False)
+        print(f"Saved all params for all replicates to {output_path}")
+
+    ### Methods for spheroid_files
+    @staticmethod
+    def save_IT_profile_plot(spheroid_file, output_path):
+        output_folder = os.path.join(output_path, "plots")
+        os.makedirs(output_folder, exist_ok=True)
+        save_path = os.path.join(output_folder, "save_IT_profile_plot.png")
+        spheroid_file.visualize_IT_profile(save_path=save_path)
+    
+    @staticmethod
+    def save_color_plot_data(spheroid_file, output_path):
+        output_folder = os.path.join(output_path, "plots")
+        os.makedirs(output_folder, exist_ok=True)
+        save_path = os.path.join(output_folder, "color_plot.png")
+        spheroid_file.visualize_color_plot_data(save_path=save_path)
+
+    ### Methods for group_analysis
+    @staticmethod
+    def save_mean_ITs_plot(group_analysis, output_path):
+        output_folder = os.path.join(output_path, "plots")
+        os.makedirs(output_folder, exist_ok=True)
+        save_path = os.path.join(output_folder, "mean_ITs.png")
+        group_analysis.plot_mean_ITs(save_path=save_path)
+
+    @staticmethod
+    def save_unprocessed_first_ITs_plot(group_analysis, output_path):
+        output_folder = os.path.join(output_path, "plots")
+        os.makedirs(output_folder, exist_ok=True)
+        save_path = os.path.join(output_folder, "unprocessed_first_ITs_plot.png")
+        group_analysis.plot_unprocessed_first_ITs(save_path=save_path)
+
+    @staticmethod
+    def save_plot_tau_over_time(group_analysis, output_path):
+        output_folder = os.path.join(output_path, "plots")
+        os.makedirs(output_folder, exist_ok=True)
+        save_path = os.path.join(output_folder, "plot_tau_over_time.png")
+        group_analysis.plot_tau_over_time(save_path=save_path)
+
+    @staticmethod
+    def save_plot_exponential_fit_aligned(group_analysis, output_path, replicated_time_point=0):
+        output_folder = os.path.join(output_path, "plots")
+        os.makedirs(output_folder, exist_ok=True)
+        save_path = os.path.join(output_folder, "plot_exponential_fit.png")
+        group_analysis.plot_exponential_fit_aligned(save_path=save_path, replicate_time_point=replicated_time_point)
+
+    #@staticmethod
+    #def save_plot_amplitudes_over_time_single_experiment(group_analysis, output_path):
+        #output_folder = os.path.join(output_path, "plots")
+        #os.makedirs(output_folder, exist_ok=True)
+        #group_analysis.save_plot_amplitudes_over_time_single_experiment(save_path=output_folder)
+    
+    @staticmethod
+    def save_plot_all_amplitudes_over_time(group_analysis, output_path):
+        output_folder = os.path.join(output_path, "plots")
+        os.makedirs(output_folder, exist_ok=True)
+        save_path = os.path.join(output_folder, "plot_all_amplitudes_over_time.png")
+        group_analysis.plot_all_amplitudes_over_time(save_path=save_path)
+
+    @staticmethod
+    def save_plot_mean_amplitudes_over_time(group_analysis, output_path):
+        output_folder = os.path.join(output_path, "plots")
+        os.makedirs(output_folder, exist_ok=True)
+        save_path = os.path.join(output_folder, "plot_mean_amplitudes_over_time.png")
+        group_analysis.plot_mean_amplitudes_over_time(save_path=save_path)
+
+    @staticmethod
+    def save_plot_first_stim_amplitudes(group_analysis, output_path):
+        output_folder = os.path.join(output_path, "plots")
+        os.makedirs(output_folder, exist_ok=True)
+        save_path = os.path.join(output_folder, "plot_first_stim_amplitudes.png")
+        group_analysis.plot_first_stim_amplitudes(save_path=save_path)
+        
 
 if __name__ == "__main__":
     # Example usage
@@ -192,5 +333,17 @@ if __name__ == "__main__":
     OutputManager.save_all_peak_amplitudes(group_analysis,output_folder)
     #OutputManager.save_original_ITs(group_analysis,output_folder)
     #OutputManager.save_peak_amplitudes_metrics(group_analysis,output_folder)
+    OutputManager.save_all_reuptake_curves(group_analysis,output_folder)
+    OutputManager.save_all_exponential_fitting_params(group_analysis,output_folder)
+
+    # 2. Save group-level plots
+    OutputManager.save_mean_ITs_plot(group_analysis, output_folder)
+    OutputManager.save_unprocessed_first_ITs_plot(group_analysis, output_folder)
+    OutputManager.save_plot_tau_over_time(group_analysis, output_folder)
+    #OutputManager.save_plot_amplitudes_over_time_single_experiment(group_analysis, output_folder)
+    OutputManager.save_plot_mean_amplitudes_over_time(group_analysis, output_folder)
+    OutputManager.save_plot_all_amplitudes_over_time(group_analysis, output_folder)
+    OutputManager.save_plot_exponential_fit_aligned(group_analysis, output_folder)
+    #OutputManager.save_plot_first_stim_amplitudes(group_analysis, output_folder)
 
 

@@ -72,7 +72,45 @@ class GroupAnalysis:
             ITs[i, :] = IT_individual
         
         return ITs
+    
+    def get_all_reuptake_curves(self):
 
+        from scipy.optimize import curve_fit
+        n_experiments = len(self.experiments)
+        if n_experiments == 0:
+            return None, None, None, None
+        # Assume all experiments have the same number of files/timepoints
+        n_timepoints = self.experiments[0].get_file_time_points()
+        files_before_treatment = self.experiments[0].get_number_of_files_before_treatment() # This will be zero if no files before treatment
+        file_count = self.experiments[0].get_file_count()
+
+        all_ITs = np.empty((n_experiments*file_count, n_timepoints))
+        peak_amplitude_positions = []
+        
+        for i, experiment in enumerate(self.experiments):
+            for j, spheroid_file in enumerate(experiment.files):
+                spheroid_file = experiment.get_spheroid_file(j)
+                IT_individual = spheroid_file.get_processed_data_IT()
+                metadata = spheroid_file.get_metadata()
+                peak_amplitude_positions.append((metadata["peak_amplitude_positions"]))
+                all_ITs[i*file_count+j, :] = IT_individual
+
+        # Turning peak_amplitude_positions into a list of integers
+        peaks = [p.item() for p in peak_amplitude_positions]
+        min_peak = np.min(peaks)
+
+        pre_allocated_ITs_array = np.full((n_experiments*file_count, n_timepoints - min_peak), np.nan)       
+        # Fill the pre-allocated array with the cropped ITs, starting from the peak position
+        for i, (row, peak) in enumerate(zip(all_ITs, peaks)):
+            print(i)
+            peak = int(peak)
+            cropped = row[peak:]
+            length = cropped.shape[0]
+            pre_allocated_ITs_array[i, :length] = cropped
+            
+        print(pre_allocated_ITs_array)
+        return pre_allocated_ITs_array
+    
     def average_IT_over_replicates(self):
         """
         This method gets the IT profiles of all experiments of all files
@@ -209,7 +247,7 @@ class GroupAnalysis:
         all_ITs = np.empty((n_experiments, n_timepoints))
         peak_amplitude_positions = []
 
-        actual_index = replicate_time_point + files_before_treatment
+        actual_index = replicate_time_point
         for i, experiment in enumerate(self.experiments):
             file = experiment.get_spheroid_file(actual_index)
             IT_individual = file.get_processed_data_IT()
@@ -294,6 +332,28 @@ class GroupAnalysis:
                 tau_err_list.append(np.nan)
         return tau_list, tau_err_list
     
+    def get_exponential_fit_params_over_time(self):
+        """
+        Runs exponential_fitting_replicated for each replicate time point,
+        collects A, tau, C and their errors, and returns them as a 2D numpy array.
+        Columns: A_fit, A_error, tau_fit, tau_error, C_fit, C_error
+        Rows: replicate time points
+        """
+        n_files = self.experiments[0].get_file_count() #16 timepoints for our current example
+        results = []
+        for t in range(n_files):
+            try:
+                _, _, _, _, popt, pcov, A_fit, tau_fit, C_fit = self.exponential_fitting_replicated(replicate_time_point=t)
+                if pcov is not None and pcov.shape == (3, 3):
+                    perr = np.sqrt(np.diag(pcov))
+                    A_err, tau_err, C_err = perr[0], perr[1], perr[2]
+                else:
+                    A_err, tau_err, C_err = np.nan, np.nan, np.nan
+                results.append([A_fit, A_err, tau_fit, tau_err, C_fit, C_err])
+            except Exception as e:
+                results.append([np.nan]*6)
+        return np.array(results)
+    
     def exponential_fitting_replicated_legacy(self, replicate_time_point = 0, global_peak_amplitude_position=None):
         """
         This function implements an exponential fitting curve over the replicates 
@@ -302,7 +362,7 @@ class GroupAnalysis:
         Input:
         - replicate_time_point is the index to gather the data from. 
         (e.g. if files are collected every 10 min, and there are three files pre-treatment
-          index -3 will be the first file before treatment, index 3 will be the first file after treatment)
+          index 0 will be the first file before treatment, index 3 will be the first file after treatment)
         returns 
         """
 
@@ -374,7 +434,7 @@ class GroupAnalysis:
 
         return time_all, ITs_flattened, t_half, popt, pcov,  A_fit, tau_fit, C_fit
 
-    def plot_exponential_fit_aligned(self, replicate_time_point=0):
+    def plot_exponential_fit_aligned(self, replicate_time_point=0, save_path=None):
         """
         Plot each post-peak IT trace, the mean decay, the exponential fit, 
         its 95% CI, and mark the half-life, all on a common “time since peak” axis.
@@ -384,7 +444,7 @@ class GroupAnalysis:
         import numpy as np
 
         # 1) run your fit and get the aligned, cropped IT matrix
-        time_all, cropped_ITs, _,t_half, popt, pcov, A_fit, tau_fit, C_fit = \
+        time_all, cropped_ITs, _, t_half, popt, pcov, A_fit, tau_fit, C_fit = \
             self.exponential_fitting_replicated(replicate_time_point)
         # cropped_ITs: shape (n_experiments, n_post_peak_points)
 
@@ -413,46 +473,54 @@ class GroupAnalysis:
         upper_ci = y_fit + ci
 
         # 6) start plotting
-        plt.figure(figsize=(10,6))
+        fig, ax = plt.subplots(figsize=(10,6))
 
         # a) each replicate in light gray
         for row in cropped_ITs:
-            plt.plot(t_rel, row, color='gray', alpha=0.3, lw=1, label='_nolegend_')
+            ax.plot(t_rel, row, color='gray', alpha=0.3, lw=1, label='_nolegend_')
 
         # b) mean ± 1 SD ribbon
-        plt.fill_between(t_rel,
+        ax.fill_between(t_rel,
                         mean_IT - std_IT,
                         mean_IT + std_IT,
                         color='C0', alpha=0.2,
                         label='Mean ± 1 SD')
 
         # c) mean trace
-        plt.plot(t_rel, mean_IT, color='C0', lw=2, label='Mean trace')
+        ax.plot(t_rel, mean_IT, color='C0', lw=2, label='Mean trace')
 
         # d) fitted exponential curve
-        plt.plot(t_fit_rel, y_fit, color='C1', lw=2, label='Exp fit')
+        ax.plot(t_fit_rel, y_fit, color='C1', lw=2, label='Exp fit')
 
         # e) 95% CI around the fit
-        plt.fill_between(t_fit_rel,
+        ax.fill_between(t_fit_rel,
                         lower_ci,
                         upper_ci,
                         color='C1', alpha=0.3,
                         label='95% CI')
 
         # f) half-life marker
-        plt.axvline(t_half, color='magenta', ls='--',
+        ax.axvline(t_half, color='magenta', ls='--',
                     label=f't½ ≈ {t_half:.1f} pts')
 
         # 7) labels & styling
-        plt.xlabel('Time since peak (points)', fontsize=12)
-        plt.ylabel('Current (nA)', fontsize=12)
-        plt.title('Post-peak IT decays & exponential fit', fontsize=14)
-        plt.legend(frameon=False)
-        plt.grid(False)
-        plt.tight_layout()
-        plt.show()
-    
-    def plot_tau_over_time(self):
+        ax.set_xlabel('Time since peak (points)', fontsize=12)
+        ax.set_ylabel('Current (nA)', fontsize=12)
+        ax.set_title('Post-peak IT decays & exponential fit', fontsize=14)
+        ax.legend(frameon=False)
+        ax.grid(False)
+        fig.tight_layout()
+
+        if save_path:
+            fig.savefig(save_path, dpi=300, bbox_inches='tight')
+            plt.close(fig)
+        else:
+            plt.show()
+
+        return fig, ax
+
+
+    def plot_tau_over_time(self, save_path=None):
         """
         Plots the exponential decay parameter tau over replicate time points.
         """
@@ -474,7 +542,11 @@ class GroupAnalysis:
         plt.grid(True)
         plt.legend()
         plt.tight_layout()
-        plt.show()
+        if save_path:
+            plt.savefig(save_path, dpi=300, bbox_inches='tight')
+            plt.close()
+        else:
+            plt.show()
 
     def plot_exponential_fit_with_CI_legacy(self, replicate_time_point=0, global_peak_position=None):
         import matplotlib.pyplot as plt
@@ -565,7 +637,7 @@ class GroupAnalysis:
         plt.tight_layout()
         plt.show()
 
-    def plot_amplitudes_over_time_single_experiment(self, experiment_index=0):
+    def plot_amplitudes_over_time_single_experiment(self, experiment_index=0, save_path=None):
         """
         Plot the amplitudes of a single experiment over time, with treatment point clearly marked.
         """
@@ -603,9 +675,14 @@ class GroupAnalysis:
         plt.title('Amplitude Over Time Relative to Treatment', fontsize=14)
         plt.legend()
         plt.tight_layout()
-        plt.show()
+        if save_path:
+            plt.savefig(save_path, dpi=300, bbox_inches='tight')
+            plt.close()
+        else:
+            plt.show()
+
     
-    def plot_mean_amplitudes_over_time(self):
+    def plot_mean_amplitudes_over_time(self, save_path=None):
         """
         Plot the mean amplitudes over time across all experiments,
         with the standard deviation as a shaded area.
@@ -630,9 +707,14 @@ class GroupAnalysis:
         plt.legend()
         plt.xticks(np.arange(0, max(time_points) + 1, 10), fontsize=10)
         plt.tight_layout()
-        plt.show()
-    
-    def plot_all_amplitudes_over_time(self):
+        if save_path:
+            plt.savefig(save_path, dpi=300, bbox_inches='tight')
+            plt.close()
+        else:
+            plt.show()
+
+
+    def plot_all_amplitudes_over_time(self, save_path=None):
         """
         Plot all amplitudes over time for each experiment as separate lines.
         """
@@ -653,9 +735,14 @@ class GroupAnalysis:
         plt.legend()
         plt.xticks(np.arange(0, max(time_points) + 1, 10), fontsize=10)
         plt.tight_layout()
-        plt.show()
+        if save_path:
+            plt.savefig(save_path, dpi=300, bbox_inches='tight')
+            plt.close()
+        else:
+            plt.show()
 
-    def plot_first_stim_amplitudes(self):
+
+    def plot_first_stim_amplitudes(self, save_path=None):
         """
         Plot the unnormalized amplitudes of the first stimulation for all experiments (replicates).
         Each replicate is shown as a bar or point, with optional mean and std.
@@ -689,9 +776,14 @@ class GroupAnalysis:
         plt.xticks(x, [f"Rep {i}" for i in x])
         plt.legend()
         plt.tight_layout()
-        plt.show()
+        if save_path:
+            plt.savefig(save_path, dpi=300, bbox_inches='tight')
+            plt.close()
+        else:
+            plt.show()
 
-    def plot_mean_ITs(self):
+
+    def plot_mean_ITs(self, save_path=None):
         """
         Plots the mean IT profiles over replicates, highlighting files before treatment and marking the first file after treatment.
         
@@ -735,9 +827,13 @@ class GroupAnalysis:
 
         # Show the plot
         plt.tight_layout()
-        plt.show()
+        if save_path:
+            plt.savefig(save_path, dpi=300, bbox_inches='tight')
+            plt.close()
+        else:
+            plt.show()
 
-    def plot_unprocessed_first_ITs(self):
+    def plot_unprocessed_first_ITs(self, save_path=None):
         """
         Plots the unprocessed first ITs of replicates.
         The x-axis represents the amplitude of the signal, and the y-axis represents time in seconds.
@@ -769,8 +865,11 @@ class GroupAnalysis:
 
         # Show the plot
         plt.tight_layout()
-        plt.show()
-    
+        if save_path:
+            plt.savefig(save_path, dpi=300, bbox_inches='tight')
+            plt.close()
+        else:
+            plt.show()
 
 if __name__ == "__main__":
     import time
@@ -814,5 +913,6 @@ if __name__ == "__main__":
     #group_analysis.plot_all_amplitudes_over_time()
     #group_analysis.amplitudes_first_stim()
     #group_analysis.plot_first_stim_amplitudes()
-    group_analysis.plot_tau_over_time()
-
+    #group_analysis.plot_tau_over_time()
+    group_analysis.get_all_reuptake_curves()
+    params_matrix = group_analysis.get_exponential_fit_params_over_time()
