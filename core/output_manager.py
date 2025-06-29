@@ -238,6 +238,71 @@ class OutputManager:
         df.to_csv(output_path, index=False)
         print(f"Saved all params for all replicates to {output_path}")
 
+    ### Methods for spheroid_files
+    @staticmethod
+    def save_IT_profile_plot(spheroid_file, output_path):
+        output_folder = os.path.join(output_path, "plots")
+        os.makedirs(output_folder, exist_ok=True)
+        save_path = os.path.join(output_folder, "save_IT_profile_plot.png")
+        spheroid_file.visualize_IT_profile(save_path=save_path)
+    
+    @staticmethod
+    def save_color_plot_data(spheroid_file, output_path):
+        output_folder = os.path.join(output_path, "plots")
+        os.makedirs(output_folder, exist_ok=True)
+        save_path = os.path.join(output_folder, "color_plot.png")
+        spheroid_file.visualize_color_plot_data(save_path=save_path)
+
+    ### Methods for group_analysis
+    @staticmethod
+    def save_mean_ITs_plot(group_analysis, output_path):
+        output_folder = os.path.join(output_path, "plots")
+        os.makedirs(output_folder, exist_ok=True)
+        save_path = os.path.join(output_folder, "mean_ITs.png")
+        group_analysis.plot_mean_ITs(save_path=save_path)
+
+    @staticmethod
+    def save_unprocessed_first_ITs_plot(group_analysis, output_path):
+        output_folder = os.path.join(output_path, "plots")
+        os.makedirs(output_folder, exist_ok=True)
+        save_path = os.path.join(output_folder, "unprocessed_first_ITs_plot.png")
+        group_analysis.plot_unprocessed_first_ITs(save_path=save_path)
+
+    @staticmethod
+    def save_plot_tau_over_time(group_analysis, output_path):
+        output_folder = os.path.join(output_path, "plots")
+        os.makedirs(output_folder, exist_ok=True)
+        save_path = os.path.join(output_folder, "plot_tau_over_time.png")
+        group_analysis.plot_tau_over_time(save_path=save_path)
+    
+    #@staticmethod
+    #def save_plot_amplitudes_over_time_single_experiment(group_analysis, output_path):
+        #output_folder = os.path.join(output_path, "plots")
+        #os.makedirs(output_folder, exist_ok=True)
+        #group_analysis.save_plot_amplitudes_over_time_single_experiment(save_path=output_folder)
+    
+    @staticmethod
+    def save_plot_all_amplitudes_over_time(group_analysis, output_path):
+        output_folder = os.path.join(output_path, "plots")
+        os.makedirs(output_folder, exist_ok=True)
+        save_path = os.path.join(output_folder, "plot_all_amplitudes_over_time.png")
+        group_analysis.plot_all_amplitudes_over_time(save_path=save_path)
+
+    @staticmethod
+    def save_plot_mean_amplitudes_over_time(group_analysis, output_path):
+        output_folder = os.path.join(output_path, "plots")
+        os.makedirs(output_folder, exist_ok=True)
+        save_path = os.path.join(output_folder, "plot_mean_amplitudes_over_time.png")
+        group_analysis.plot_mean_amplitudes_over_time(save_path=save_path)
+
+    @staticmethod
+    def save_plot_first_stim_amplitudes(group_analysis, output_path):
+        output_folder = os.path.join(output_path, "plots")
+        os.makedirs(output_folder, exist_ok=True)
+        save_path = os.path.join(output_folder, "plot_first_stim_amplitudes.png")
+        group_analysis.plot_first_stim_amplitudes(save_path=save_path)
+        
+
 if __name__ == "__main__":
     # Example usage
     folder_first_experiment = r"/Users/pabloprieto/Library/CloudStorage/OneDrive-Personal/Documentos/1st_Year_PhD/Projects/NeuroStemVolt/data/241111_batch1_n1_Sert"
@@ -263,5 +328,14 @@ if __name__ == "__main__":
     #OutputManager.save_peak_amplitudes_metrics(group_analysis,output_folder)
     OutputManager.save_all_reuptake_curves(group_analysis,output_folder)
     OutputManager.save_all_exponential_fitting_params(group_analysis,output_folder)
+
+    # 2. Save group-level plots
+    OutputManager.save_mean_ITs_plot(group_analysis, output_folder)
+    OutputManager.save_unprocessed_first_ITs_plot(group_analysis, output_folder)
+    OutputManager.save_plot_tau_over_time(group_analysis, output_folder)
+    #OutputManager.save_plot_amplitudes_over_time_single_experiment(group_analysis, output_folder)
+    OutputManager.save_plot_mean_amplitudes_over_time(group_analysis, output_folder)
+    OutputManager.save_plot_all_amplitudes_over_time(group_analysis, output_folder)
+    #OutputManager.save_plot_first_stim_amplitudes(group_analysis, output_folder)
 
 
