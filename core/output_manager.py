@@ -274,7 +274,14 @@ class OutputManager:
         os.makedirs(output_folder, exist_ok=True)
         save_path = os.path.join(output_folder, "plot_tau_over_time.png")
         group_analysis.plot_tau_over_time(save_path=save_path)
-    
+
+    @staticmethod
+    def save_plot_exponential_fit_aligned(group_analysis, output_path, replicated_time_point=0):
+        output_folder = os.path.join(output_path, "plots")
+        os.makedirs(output_folder, exist_ok=True)
+        save_path = os.path.join(output_folder, "plot_exponential_fit.png")
+        group_analysis.plot_exponential_fit_aligned(save_path=save_path, replicate_time_point=replicated_time_point)
+
     #@staticmethod
     #def save_plot_amplitudes_over_time_single_experiment(group_analysis, output_path):
         #output_folder = os.path.join(output_path, "plots")
@@ -336,6 +343,7 @@ if __name__ == "__main__":
     #OutputManager.save_plot_amplitudes_over_time_single_experiment(group_analysis, output_folder)
     OutputManager.save_plot_mean_amplitudes_over_time(group_analysis, output_folder)
     OutputManager.save_plot_all_amplitudes_over_time(group_analysis, output_folder)
+    OutputManager.save_plot_exponential_fit_aligned(group_analysis, output_folder)
     #OutputManager.save_plot_first_stim_amplitudes(group_analysis, output_folder)
 
 
