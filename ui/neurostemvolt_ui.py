@@ -20,9 +20,9 @@ class IntroPage(QWizardPage):
         self.setTitle("NeuroStemVolt")
         # Initialising the group_analysis object
         self.group_analysis = GroupAnalysis()
-
+        self.display_names_list = []
+        
         # This will hold our backend experiment objects
-        self.replicates = []  
         self.stim_params = None
         # This will hold the current experiment settings
         self.experiment_settings = None
@@ -53,7 +53,6 @@ class IntroPage(QWizardPage):
 
     def clear_replicates(self):
         """Start a brand-new experiment group."""
-        self.replicates.clear()
         self.group_analysis.clear_experiments()
         self.list_widget.clear()
     
@@ -82,7 +81,7 @@ class IntroPage(QWizardPage):
         
         self.group_analysis.add_experiment(exp)
         # store it and show it in the list
-        self.replicates.append(exp)
+        self.display_names_list.append(f"{os.path.basename(folder)}")
         display_name = f"{os.path.basename(folder)}"
         self.list_widget.addItem(display_name)
         
@@ -93,6 +92,7 @@ class IntroPage(QWizardPage):
         """
         # e.g. store into the wizard object:
         self.wizard().group_analysis = self.group_analysis
+        self.wizard().display_names_list = self.display_names_list
         return True
     
 
@@ -185,7 +185,7 @@ class ExperimentSettingsDialog(QDialog):
             "file_type":              self.cb_file_type.currentText(),
             "stim_params":            self.stim_params,    # you initialized this in __init__
         }
-    
+
 class StimParamsDialog(QDialog):
     def __init__(self, parent=None, defaults=None):
         super().__init__(parent)
@@ -206,26 +206,47 @@ class StimParamsDialog(QDialog):
     def get_params(self):
         return {k: float(self.edits[k].text()) for k in self.edits}
 
+
+### Second Page
+
 class ColorPlotPage(QWizardPage):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setTitle("Color Plot")
-
+    
         # Left controls
         btn_back = QPushButton("Back")
         btn_eval = QPushButton("Evaluate")
-        cbo_rep = QComboBox(); cbo_rep.addItem("Replicate x")
-        txt_file = QLineEdit(); txt_file.setPlaceholderText("File name")
+
+        self.cbo_rep = QComboBox(); 
+        self.cbo_rep.currentIndexChanged.connect(self.on_replicate_changed)
+        
+        #### Handle the signal from cbo_rep
+
+        self.txt_file = QLineEdit(); 
+        self.txt_file.setReadOnly(True)
+
+        # Default indexes to visualize
+        self.current_rep_index = 0
+        self.current_file_index = 0
+
         btn_prev = QPushButton("Previous"); btn_next = QPushButton("Next")
+        btn_prev.clicked.connect(self.on_prev_clicked)
+        btn_next.clicked.connect(self.on_next_clicked)
+
+        #### Handle the signal from prev and next btn
+
         btn_filter = QPushButton("Filter Options"); btn_apply = QPushButton("Apply Filtering")
         btn_save = QPushButton("Save Plots"); btn_export = QPushButton("Export Results")
 
         left = QVBoxLayout()
         left.addWidget(btn_back)
         left.addWidget(btn_eval)
-        left.addWidget(cbo_rep)
-        left.addWidget(txt_file)
+        left.addWidget(self.cbo_rep)
+        left.addWidget(self.txt_file)
+
         nav = QHBoxLayout(); nav.addWidget(btn_prev); nav.addWidget(btn_next)
+    
         left.addLayout(nav)
         left.addWidget(btn_filter)
         left.addWidget(btn_apply)
@@ -253,7 +274,51 @@ class ColorPlotPage(QWizardPage):
         layout.addLayout(left)
         layout.addLayout(right)
         self.setLayout(layout)
+    
+    def initializePage(self):
+        # Default index
+        def_index = 0
 
+        group_analysis = self.wizard().group_analysis
+        display_names_list = self.wizard().display_names_list
+        
+        self.cbo_rep.clear()
+        self.cbo_rep.addItems(display_names_list)
+        self.cbo_rep.setCurrentIndex(def_index)
+        
+        current_exp = group_analysis.get_single_experiments(def_index)
+        current_file = current_exp.get_spheroid_file(def_index)
+        current_file_name = os.path.basename(current_file.get_filepath())
+
+        self.txt_file.setText(current_file_name)
+    
+    def on_replicate_changed(self, index):
+        self.current_rep_index = index
+        self.current_file_index = 0
+        self.update_file_display()
+
+    def update_file_display(self):
+        group_analysis = self.wizard().group_analysis
+        try:
+            exp = group_analysis.get_single_experiments(self.current_rep_index)
+            sph_file = exp.get_spheroid_file(self.current_file_index)
+            file_name = os.path.basename(sph_file.get_filepath())
+            self.txt_file.setText(file_name)
+        except IndexError:
+            self.txt_file.setText("No file at this index")
+
+    def on_next_clicked(self):
+        exp = self.wizard().group_analysis.get_single_experiments(self.current_rep_index)
+        if self.current_file_index < exp.get_file_count() - 1:
+            self.current_file_index += 1
+            self.update_file_display()
+
+    def on_prev_clicked(self):
+        if self.current_file_index > 0:
+            self.current_file_index -= 1
+            self.update_file_display()
+
+### Third Page
 
 class ResultsPage(QWizardPage):
     def __init__(self, parent=None):
