@@ -57,8 +57,9 @@ class IntroPage(QWizardPage):
         """Ask the user to pick a folder, build & run the SpheroidExperiment, and display it."""
         
         if self.experiment_settings is None:
-            # Prompt user for settings (could be a custom dialog)
-            self.experiment_settings = self.load_experiment_settings()
+            if not self.show_experiment_settings_dialog():
+                return   # user cancelled, bail out
+
         settings = self.experiment_settings
         
         #exp = SpheroidExperiment(
