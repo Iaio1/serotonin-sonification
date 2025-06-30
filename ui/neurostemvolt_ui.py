@@ -160,7 +160,7 @@ class ExperimentSettingsDialog(QDialog):
     def handle_accept(self):
         # if they choose stimulation, pop the sub-dialog
         if self.cb_file_type.currentText() == "Stimulation":
-            dlg = StimParamsDialog(self)
+            dlg = StimParamsDialog(self, defaults=self.stim_params)
             if dlg.exec_() == QDialog.Accepted:
                 self.stim_params = dlg.get_params()
             else:
@@ -176,7 +176,9 @@ class ExperimentSettingsDialog(QDialog):
         self.qsettings.setValue("files_before_treatment",int(self.le_files_before.text()))
         self.qsettings.setValue("file_type",             self.cb_file_type.currentText())
         # stim_params → JSON string
-        self.qsettings.setValue("stim_params",           json.dumps(self.stim_params))
+        print("Saving stim_params:", self.stim_params)
+        self.qsettings.setValue("stim_params", json.dumps(self.stim_params))
+        print("After setValue, reload raw:", self.qsettings.value("stim_params"))
 
         # close dialog
         self.accept()
