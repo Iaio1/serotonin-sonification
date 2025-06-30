@@ -117,7 +117,7 @@ class ExperimentSettingsDialog(QDialog):
             "file_length":           self.qsettings.value("file_length",           100,    type=int),
             "acquisition_frequency": self.qsettings.value("acquisition_frequency", 10,     type=int),
             "peak_position":         self.qsettings.value("peak_position",         257,    type=int),
-            "treatment":             self.qsettings.value("treatment",             "",     type=str),
+            "treatment":             self.qsettings.value("treatment",             "None", type=str),
             "waveform":              self.qsettings.value("waveform",              "5HT",  type=str),
             "time_between_files":    self.qsettings.value("time_between_files",    10,     type=int),
             "files_before_treatment":self.qsettings.value("files_before_treatment",3,      type=int),
@@ -158,7 +158,7 @@ class ExperimentSettingsDialog(QDialog):
         buttons.rejected.connect(self.reject)
 
     def handle_accept(self):
-        # if they chose stimulation, pop the sub-dialog (as you already do)…
+        # if they choose stimulation, pop the sub-dialog
         if self.cb_file_type.currentText() == "Stimulation":
             dlg = StimParamsDialog(self)
             if dlg.exec_() == QDialog.Accepted:
@@ -172,7 +172,7 @@ class ExperimentSettingsDialog(QDialog):
         self.qsettings.setValue("peak_position",         int(self.le_peak_pos.text()))
         self.qsettings.setValue("treatment",             self.le_treatment.text())
         self.qsettings.setValue("waveform",              self.cb_waveform.currentText())
-        self.qsettings.setValue("time_between_files",    float(self.le_time_btw.text()))
+        self.qsettings.setValue("time_between_files",    int(self.le_time_btw.text()))
         self.qsettings.setValue("files_before_treatment",int(self.le_files_before.text()))
         self.qsettings.setValue("file_type",             self.cb_file_type.currentText())
         # stim_params → JSON string
