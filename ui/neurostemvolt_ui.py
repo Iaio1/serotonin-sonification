@@ -1,9 +1,14 @@
 from PyQt5.QtWidgets import (
     QApplication, QWizard, QComboBox, QLineEdit, QWizardPage, QLabel, QPushButton, QVBoxLayout, QHBoxLayout,
-    QListWidget, QFileDialog, QInputDialog, QGridLayout
+    QListWidget, QFileDialog, QInputDialog, QGridLayout, QFormLayout, QLineEdit, QDialog, QCheckBox, QDialogButtonBox
 )
+from PyQt5.QtCore import QSettings
+from PyQt5.QtGui import QIcon
+
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
+
+import json
 import numpy as np
 import os
 from core.group_analysis import GroupAnalysis
@@ -13,9 +18,9 @@ class IntroPage(QWizardPage):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setTitle("NeuroStemVolt")
-        
         # This will hold our backend experiment objects
         self.replicates = []  
+        self.stim_params = None
         # This will hold the current experiment settings
         self.experiment_settings = None
 
@@ -26,7 +31,7 @@ class IntroPage(QWizardPage):
         self.btn_load = QPushButton("Load Replicate.")
         self.btn_load.clicked.connect(self.load_replicate)
         self.btn_exp_settings = QPushButton("Experiment Settings")
-        self.btn_exp_settings.clicked.connect(self.load_experiment_settings)
+        self.btn_exp_settings.clicked.connect(self.show_experiment_settings_dialog)
         
         # 3) Layout
         v = QVBoxLayout()
@@ -36,7 +41,13 @@ class IntroPage(QWizardPage):
         v.addWidget(self.list_widget)
         v.addWidget(self.btn_exp_settings)
         self.setLayout(v)
-    
+
+    def show_experiment_settings_dialog(self):
+        dlg = ExperimentSettingsDialog(self)
+        if dlg.exec_() == QDialog.Accepted:
+            # Here, extract the settings from the dialog and store them
+            self.experiment_settings = dlg.get_settings()
+
     def clear_replicates(self):
         """Start a brand-new experiment group."""
         self.replicates.clear()
@@ -82,7 +93,7 @@ class IntroPage(QWizardPage):
         #self.replicates.append(exp)
         display_name = f"{os.path.basename(folder)}"
         self.list_widget.addItem(display_name)
-    
+        
     def validatePage(self):
         """
         This is called automatically when the user clicks 'Continue'.
@@ -94,9 +105,114 @@ class IntroPage(QWizardPage):
             self.wizard().group_analysis.add_experiment(exp)
         return True
     
-    def load_experiment_settings(self):
-        None
 
+class ExperimentSettingsDialog(QDialog):
+    def __init__(self, parent=None, defaults=None):
+        super().__init__(parent)
+        self.setWindowTitle("Experiment Settings")
+
+        self.qsettings = QSettings("HashemiLab", "NeuroStemVolt")
+
+        defaults = {
+            "file_length":           self.qsettings.value("file_length",           100,    type=int),
+            "acquisition_frequency": self.qsettings.value("acquisition_frequency", 10,     type=int),
+            "peak_position":         self.qsettings.value("peak_position",         257,    type=int),
+            "treatment":             self.qsettings.value("treatment",             "",     type=str),
+            "waveform":              self.qsettings.value("waveform",              "5HT",  type=str),
+            "time_between_files":    self.qsettings.value("time_between_files",    10,     type=int),
+            "files_before_treatment":self.qsettings.value("files_before_treatment",3,      type=int),
+            "file_type":             self.qsettings.value("file_type",             "None", type=str),
+            # stim_params might be stored as JSON
+            "stim_params":           json.loads(self.qsettings.value("stim_params", "{}")),
+        }
+
+        vbox = QVBoxLayout()
+        
+        # Form layout for labeled fields
+        form = QFormLayout()
+        vbox.addLayout(form)
+
+        self.le_file_length = QLineEdit(str(defaults["file_length"]));            form.addRow("File Length:", self.le_file_length)
+        self.le_acq_freq    = QLineEdit(str(defaults["acquisition_frequency"]));  form.addRow("Acquisition Freq:", self.le_acq_freq)
+        self.le_peak_pos    = QLineEdit(str(defaults["peak_position"]));          form.addRow("Peak Pos:", self.le_peak_pos)
+        self.le_treatment   = QLineEdit(defaults["treatment"]);                   form.addRow("Treatment:", self.le_treatment)
+
+        self.cb_waveform    = QComboBox();  self.cb_waveform.addItems(["5HT","Else"])
+        self.cb_waveform.setCurrentText(defaults["waveform"]);                     form.addRow("Waveform:", self.cb_waveform)
+
+        self.le_time_btw    = QLineEdit(str(defaults["time_between_files"]));     form.addRow("Time Between Files:", self.le_time_btw)
+        self.le_files_before= QLineEdit(str(defaults["files_before_treatment"])); form.addRow("Files Before Treatment:", self.le_files_before)
+
+        self.cb_file_type   = QComboBox(); self.cb_file_type.addItems(["None","Spontaneous","Stimulation"])
+        self.cb_file_type.setCurrentText(defaults["file_type"]);                   form.addRow("File Type:", self.cb_file_type)
+
+        # store loaded stim_params so get_settings() can return it if user doesn’t change it
+        self.stim_params = defaults["stim_params"]
+
+        self.setLayout(vbox)
+
+        # Add dialog buttons
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        vbox.addWidget(buttons)
+        buttons.accepted.connect(self.handle_accept)
+        buttons.rejected.connect(self.reject)
+
+    def handle_accept(self):
+        # if they chose stimulation, pop the sub-dialog (as you already do)…
+        if self.cb_file_type.currentText() == "Stimulation":
+            dlg = StimParamsDialog(self)
+            if dlg.exec_() == QDialog.Accepted:
+                self.stim_params = dlg.get_params()
+            else:
+                return  # abort if they cancelled stim-params
+
+        # now persist *all* fields
+        self.qsettings.setValue("file_length",           int(self.le_file_length.text()))
+        self.qsettings.setValue("acquisition_frequency", int(self.le_acq_freq.text()))
+        self.qsettings.setValue("peak_position",         int(self.le_peak_pos.text()))
+        self.qsettings.setValue("treatment",             self.le_treatment.text())
+        self.qsettings.setValue("waveform",              self.cb_waveform.currentText())
+        self.qsettings.setValue("time_between_files",    float(self.le_time_btw.text()))
+        self.qsettings.setValue("files_before_treatment",int(self.le_files_before.text()))
+        self.qsettings.setValue("file_type",             self.cb_file_type.currentText())
+        # stim_params → JSON string
+        self.qsettings.setValue("stim_params",           json.dumps(self.stim_params))
+
+        # close dialog
+        self.accept()
+
+    def get_settings(self):
+        return {
+            "file_length":            int(self.le_file_length.text()),
+            "acquisition_frequency":  int(self.le_acq_freq.text()),
+            "peak_position":          int(self.le_peak_pos.text()),
+            "treatment":              self.le_treatment.text(),
+            "waveform":               self.cb_waveform.currentText(),
+            "time_between_files":     float(self.le_time_btw.text()),
+            "files_before_treatment": int(self.le_files_before.text()),
+            "file_type":              self.cb_file_type.currentText(),
+            "stim_params":            self.stim_params,    # you initialized this in __init__
+        }
+    
+class StimParamsDialog(QDialog):
+    def __init__(self, parent=None, defaults=None):
+        super().__init__(parent)
+        self.setWindowTitle("Stimulation Parameters")
+        form = QFormLayout(self)
+        self.edits = {}
+        params = ["start", "duration", "frequency", "amplitude", "pulses"]
+        defaults = defaults or {"start": 5.0, "duration": 2.0, "frequency": 20, "amplitude": 0.5, "pulses": 50}
+        for p in params:
+            edit = QLineEdit(str(defaults[p]))
+            form.addRow(f"{p.capitalize()}:", edit)
+            self.edits[p] = edit
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        form.addRow(buttons)
+
+    def get_params(self):
+        return {k: float(self.edits[k].text()) for k in self.edits}
 
 class ColorPlotPage(QWizardPage):
     def __init__(self, parent=None):
