@@ -39,8 +39,8 @@ class GroupAnalysis:
 
     def get_single_experiments(self, index: int):
         """
-        Get the list of SpheroidExperiments in the group analysis.
-        :return: List of SpheroidExperiment instances.
+        Get the single experiment of SpheroidExperiments in the group analysis.
+        :return: a single SpheroidExperiment instance.
         """
         return self.experiments[index]
     def get_experiments(self):
