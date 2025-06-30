@@ -50,6 +50,12 @@ class GroupAnalysis:
         """
         return self.experiments
     
+    def clear_experiments(self):
+        """Remove all experiments from this group."""
+        self.experiments.clear()
+        #print("Replicates Cleared")
+        #print(self.get_experiments())
+
     def non_normalized_first_ITs(self):
         """
         This method gets the ITs of the first stimulation per experiment (per replicate)

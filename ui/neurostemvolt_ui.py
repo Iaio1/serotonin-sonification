@@ -18,6 +18,9 @@ class IntroPage(QWizardPage):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setTitle("NeuroStemVolt")
+        # Initialising the group_analysis object
+        self.group_analysis = GroupAnalysis()
+
         # This will hold our backend experiment objects
         self.replicates = []  
         self.stim_params = None
@@ -51,6 +54,7 @@ class IntroPage(QWizardPage):
     def clear_replicates(self):
         """Start a brand-new experiment group."""
         self.replicates.clear()
+        self.group_analysis.clear_experiments()
         self.list_widget.clear()
     
     def load_replicate(self):
@@ -61,20 +65,6 @@ class IntroPage(QWizardPage):
                 return   # user cancelled, bail out
 
         settings = self.experiment_settings
-        
-        #exp = SpheroidExperiment(
-        #    paths,
-        #    file_length=
-        #    acquisition_frequency=
-        #    acquisition_frequency=10, 
-        #    peak_position=257,
-        #    treatment="",
-        #    waveform="",  # Added waveform parameter
-        #    stim_params=None,
-        #    processors,  # Default to None
-        #    time_between_files= 10.0, # Default time between files (between stimulations and recodings (e.g. stimulating every 10 min and recoding) in minutes
-        #    files_before_treatment = 3  # Default number of files before treatment (e.g. baseline recordings)
-        #)
 
         folder = QFileDialog.getExistingDirectory(self, "Select replicate folder")
         if not folder:
@@ -88,10 +78,11 @@ class IntroPage(QWizardPage):
             # optional: warn “no .txt found”
             return
     
-        #exp = SpheroidExperiment(paths)
+        exp = SpheroidExperiment(paths,settings)
         
+        self.group_analysis.add_experiment(exp)
         # store it and show it in the list
-        #self.replicates.append(exp)
+        self.replicates.append(exp)
         display_name = f"{os.path.basename(folder)}"
         self.list_widget.addItem(display_name)
         
@@ -101,9 +92,7 @@ class IntroPage(QWizardPage):
         We can use it to stash our replicates on the wizard for later pages.
         """
         # e.g. store into the wizard object:
-        self.wizard().group_analysis = GroupAnalysis()
-        for exp in self.replicates:
-            self.wizard().group_analysis.add_experiment(exp)
+        self.wizard().group_analysis = self.group_analysis
         return True
     
 
