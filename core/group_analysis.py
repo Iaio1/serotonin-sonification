@@ -1,6 +1,6 @@
-from spheroid_experiment import SpheroidExperiment
-from processing.exponentialdecay import exp_decay
-from processing.normalize import Normalize
+from core.spheroid_experiment import SpheroidExperiment
+from core.processing.exponentialdecay import exp_decay
+from core.processing.normalize import Normalize
 import os
 import numpy as np
 
