@@ -12,6 +12,7 @@ import json
 import numpy as np
 import os
 from core.group_analysis import GroupAnalysis
+from core.output_manager import OutputManager
 from core.spheroid_experiment import SpheroidExperiment
 from core.processing import *
 
@@ -261,7 +262,9 @@ class ColorPlotPage(QWizardPage):
         btn_filter.clicked.connect(self.show_processing_options)
         btn_save = QPushButton("Save Current Plots"); 
         btn_save.clicked.connect(self.save_IT_ColorPlot)
-        btn_export = QPushButton("Export Results")
+        btn_export = QPushButton("Export Current IT")
+        btn_export.clicked.connect(self.save_processed_data_IT)
+        btn_export_all = QPushButton("Export All ITs")
 
         left = QVBoxLayout()
         left.addWidget(btn_revert)
@@ -276,6 +279,7 @@ class ColorPlotPage(QWizardPage):
         #left.addWidget(btn_apply)
         left.addWidget(btn_save)
         left.addWidget(btn_export)
+        left.addWidget(btn_export_all)
         left.addStretch(1)
 
         # Right plots
@@ -387,6 +391,12 @@ class ColorPlotPage(QWizardPage):
         output_folder_path = QSettings("HashemiLab", "NeuroStemVolt").value("output_folder")
         sph_file.visualize_color_plot_data(title_suffix = "", save_path=output_folder_path)
         sph_file.visualize_IT_profile(QSettings("HashemiLab", "NeuroStemVolt").value("output_folder"))
+
+    def save_processed_data_IT(self):
+        exp = self.wizard().group_analysis.get_single_experiments(self.current_rep_index)
+        sph_file = exp.get_spheroid_file(self.current_file_index)
+        output_folder_path = QSettings("HashemiLab", "NeuroStemVolt").value("output_folder")
+        OutputManager.save_IT_profile(sph_file,output_folder_path)
 
 class ProcessingOptionsDialog(QDialog):
     def __init__(self, parent=None, defaults=None):

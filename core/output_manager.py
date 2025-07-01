@@ -1,5 +1,5 @@
-from spheroid_experiment import SpheroidExperiment
-from group_analysis import GroupAnalysis
+from core.spheroid_experiment import SpheroidExperiment
+from core.group_analysis import GroupAnalysis
 import os
 import pandas as pd
 
@@ -30,6 +30,7 @@ class OutputManager:
                 os.mkdir(output_IT_folder)
             output_path = os.path.join(output_IT_folder, output_csv)
             df.to_csv(output_path, index_label="TimePoint")
+
     @staticmethod
     def save_all_ITs(group_experiments : GroupAnalysis, output_folder_path):
         # This function takes all experiments (after processing) 
@@ -240,14 +241,35 @@ class OutputManager:
 
     ### Methods for spheroid_files
     @staticmethod
+    def save_IT_profile(spheroid_file, output_path):
+        processed_data_IT = spheroid_file.get_processed_data_IT()
+
+        df = pd.DataFrame(processed_data_IT)
+        df.index.name = "TimePoint"
+
+        base_name = os.path.splitext(os.path.basename(spheroid_file.get_filepath()))[0]  # Remove .txt
+        df.columns = [base_name]
+        output_file_name = os.path.join(base_name + "_IT.csv")
+        
+        # Save to CSV
+        output_folder = os.path.join(output_path, "ITs")
+        os.makedirs(output_folder, exist_ok=True)
+        output_path = os.path.join(output_folder, output_file_name)
+        df.to_csv(output_path, index_label="TimePoint")
+
+        #print(f"Saved all amplitudes for all replicates to {output_path}")
+        return processed_data_IT
+
+    @staticmethod
     def save_IT_profile_plot(spheroid_file, output_path):
         output_folder = os.path.join(output_path, "plots")
         os.makedirs(output_folder, exist_ok=True)
         save_path = os.path.join(output_folder, "save_IT_profile_plot.png")
         spheroid_file.visualize_IT_profile(save_path=save_path)
+        
     
     @staticmethod
-    def save_color_plot_data(spheroid_file, output_path):
+    def save_color_plot(spheroid_file, output_path):
         output_folder = os.path.join(output_path, "plots")
         os.makedirs(output_folder, exist_ok=True)
         save_path = os.path.join(output_folder, "color_plot.png")
