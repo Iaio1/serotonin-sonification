@@ -496,8 +496,8 @@ class ResultsPage(QWizardPage):
         # Connect analysis buttons to their respective methods
         btn_avg.clicked.connect(lambda: result_plot.show_average_over_experiments(self.wizard().group_analysis))
         btn_fit.clicked.connect(lambda: result_plot.show_decay_exponential_fitting(self.wizard().group_analysis))
-        btn_param.clicked.connect(result_plot.show_tau_param_over_time)
-        btn_amp.clicked.connect(result_plot.show_amplitudes_over_time)
+        btn_param.clicked.connect(lambda: result_plot.show_tau_param_over_time(self.wizard().group_analysis))
+        btn_amp.clicked.connect(lambda: result_plot.show_amplitudes_over_time(self.wizard().group_analysis))
 
         #result_plot.plot_line()
         btn_save = QPushButton("Save Plot"); btn_export = QPushButton("Export All")
@@ -709,8 +709,55 @@ class PlotCanvas(FigureCanvas):
         self.fig.tight_layout()
         self.draw()
 
-    def show_tau_param_over_time(self):
-        pass
+    def show_tau_param_over_time(self, group_analysis):
+        """
+        Plots the exponential decay parameter tau over replicate time points on the embedded canvas.
+        """
+        import numpy as np
 
-    def show_amplitudes_over_time(self):
-        pass
+        tau_list, tau_err_list = group_analysis.get_tau_over_time()
+        n_files = group_analysis.get_experiments()[0].get_file_count()
+        time_points = np.linspace(
+            0,
+            group_analysis.get_experiments()[0].get_time_between_files() * (n_files - 1),
+            n_files
+        )
+
+        self.axes.clear()
+        self.axes.errorbar(time_points, tau_list, yerr=tau_err_list, fmt='o-', capsize=4, color='C1', label='Tau (decay constant)')
+        self.axes.set_xlabel("Time (minutes)")
+        self.axes.set_ylabel("Tau (decay constant)")
+        self.axes.set_title("Exponential Decay Tau Over Time Points")
+        self.axes.grid(True)
+        self.axes.legend()
+        self.fig.tight_layout()
+        self.draw()
+
+    def show_amplitudes_over_time(self, group_analysis):
+        """
+        Plot all amplitudes over time for each experiment as separate lines on the embedded canvas.
+        """
+        import numpy as np
+
+        time_points, mean_amplitudes, all_amplitudes, files_before_treatment = group_analysis.amplitudes_over_time_all_experiments()
+        if time_points is None:
+            self.axes.clear()
+            self.axes.set_title("No data to plot")
+            self.draw()
+            return
+
+        all_amplitudes = np.array(all_amplitudes, dtype=float)
+        treatment_time = files_before_treatment * (time_points[1] - time_points[0])
+
+        self.axes.clear()
+        for i, amplitudes in enumerate(all_amplitudes):
+            self.axes.plot(time_points, amplitudes, label=f'Experiment {i+1}', alpha=0.7)
+        if files_before_treatment > 0:
+            self.axes.axvline(x=treatment_time, color='red', linestyle='--', label='Treatment Start')
+        self.axes.set_xlabel('Time (min)')
+        self.axes.set_ylabel('Amplitude')
+        self.axes.set_title('Amplitudes Over Time (All Experiments)')
+        self.axes.legend()
+        self.axes.set_xticks(np.arange(0, max(time_points) + 1, 10))
+        self.fig.tight_layout()
+        self.draw()
