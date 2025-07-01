@@ -13,6 +13,7 @@ import numpy as np
 import os
 from core.group_analysis import GroupAnalysis
 from core.spheroid_experiment import SpheroidExperiment
+from core.processing import *
 
 class IntroPage(QWizardPage):
     def __init__(self, parent=None):
@@ -213,6 +214,8 @@ class ColorPlotPage(QWizardPage):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setTitle("Color Plot")
+
+        self.selected_processors = []
     
         # Left controls
         btn_revert = QPushButton("Revert Changes")
@@ -239,6 +242,7 @@ class ColorPlotPage(QWizardPage):
         #### Handle the signal from prev and next btn
 
         btn_filter = QPushButton("Filter Options"); #btn_apply = QPushButton("Apply Filtering")
+        btn_filter.clicked.connect(self.show_processing_options)
         btn_save = QPushButton("Save Plots"); btn_export = QPushButton("Export Results")
 
         left = QVBoxLayout()
@@ -301,7 +305,7 @@ class ColorPlotPage(QWizardPage):
 
         self.main_plot.plot_color(processed_data=processed_data)
         self.it_plot.plot_IT(processed_data=processed_data,metadata=metadata,peak_position=peak_pos)
-    
+
     def on_replicate_changed(self, index):
         self.current_rep_index = index
         self.current_file_index = 0
@@ -337,6 +341,7 @@ class ColorPlotPage(QWizardPage):
 
     def run_processing(self):
         group_analysis = self.wizard().group_analysis
+        group_analysis.set_processing_options_exp(self.selected_processors)
         for exp in group_analysis.get_experiments():
             exp.run()
         self.update_file_display()
@@ -346,6 +351,82 @@ class ColorPlotPage(QWizardPage):
         for exp in group_analysis.get_experiments():
             exp.revert_processing()
         self.update_file_display()
+
+    def show_processing_options(self):
+        dlg = ProcessingOptionsDialog(self)
+        if dlg.exec_() == QDialog.Accepted:
+            selected_names = dlg.get_selected_processors()
+            peak_pos = QSettings("HashemiLab", "NeuroStemVolt").value("peak_position")
+            self.selected_processors = [
+                ProcessingOptionsDialog.get_processor_instance(name, peak_pos)
+                for name in selected_names
+                if ProcessingOptionsDialog.get_processor_instance(name, peak_pos) is not None
+            ]
+
+class ProcessingOptionsDialog(QDialog):
+    def __init__(self, parent=None, defaults=None):
+        super().__init__(parent)
+
+        self.setWindowTitle("Filtering Options")
+
+        self.qsettings = QSettings("HashemiLab", "NeuroStemVolt")
+
+        # List of available processors and their default checked state
+        self.processor_options = [
+            ("Background Subtraction", True),
+            ("Gaussian Smoothing 2D", False),
+            ("Rolling Mean", False),
+            ("Butterworth Filter", True),
+            ("Savitzky-Golay Filter", False),
+            ("Baseline Correction", True),
+            ("Normalize", True),
+            ("Find Amplitude", True),
+            #("Exponential Fitting", True),
+        ]
+
+        self.checkboxes = {}
+        layout = QVBoxLayout()
+
+        for name, checked in self.processor_options:
+            cb = QCheckBox(name)
+            cb.setChecked(checked)
+            layout.addWidget(cb)
+            self.checkboxes[name] = cb
+        
+        # Dialog buttons
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+
+        self.setLayout(layout)
+
+    def get_processor_instance(name, peak_position=None):
+        if name == "Background Subtraction":
+            return BackgroundSubtraction(region=(0, 10))
+        elif name == "Gaussian Smoothing 2D":
+            return GaussianSmoothing2D()
+        elif name == "Rolling Mean":
+            return RollingMean()
+        elif name == "Butterworth Filter":
+            return ButterworthFilter()
+        elif name == "Savitzky-Golay Filter":
+            return SavitzkyGolayFilter(w=20, p=2)
+        elif name == "Baseline Correction":
+            return BaselineCorrection()
+        elif name == "Normalize":
+            return Normalize(peak_position)
+        elif name == "Find Amplitude":
+            return FindAmplitude(peak_position)
+        elif name == "Exponential Fitting":
+            return ExponentialFitting()
+        else:
+            return None
+
+    def get_selected_processors(self):
+        """Return a list of selected processor names."""
+        return [name for name, cb in self.checkboxes.items() if cb.isChecked()]
+
 
 ### Third Page
 
@@ -389,11 +470,10 @@ class PlotCanvas(FigureCanvas):
     def __init__(self, parent=None, width=5, height=4, dpi=100):
         fig = Figure(figsize=(width, height), dpi=dpi)
         self.fig = fig
-        self.axes = fig.add_subplot(111)  # self.axes = self.ax if you prefer
+        self.axes = fig.add_subplot(111) 
         super().__init__(fig)
         self.setParent(parent)
         fig.tight_layout()
-        # don’t touch fig.colorbar!
         self.cbar = None
 
     def plot_color(self, processed_data, title_suffix=None):
