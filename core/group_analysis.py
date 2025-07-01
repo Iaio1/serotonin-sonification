@@ -19,7 +19,7 @@ class GroupAnalysis:
             self.experiments = experiments
         else:
             raise ValueError("experiments must be None, a SpheroidExperiment, or a list of SpheroidExperiment objects.")
-        
+    
     def add_experiment(self, *experiments):
         """
         Add one or more SpheroidExperiment instances to the group analysis.
@@ -43,6 +43,7 @@ class GroupAnalysis:
         :return: a single SpheroidExperiment instance.
         """
         return self.experiments[index]
+    
     def get_experiments(self):
         """
         Get the list of SpheroidExperiments in the group analysis.
@@ -55,6 +56,10 @@ class GroupAnalysis:
         self.experiments.clear()
         #print("Replicates Cleared")
         #print(self.get_experiments())
+
+    def set_processing_options_exp(self, processors = None):
+        for exp in self.experiments:
+            exp.set_processing_steps(processors)
 
     def non_normalized_first_ITs(self):
         """
