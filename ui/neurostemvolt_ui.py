@@ -495,7 +495,7 @@ class ResultsPage(QWizardPage):
         result_plot = PlotCanvas(self, width=5, height=4)
         # Connect analysis buttons to their respective methods
         btn_avg.clicked.connect(lambda: result_plot.show_average_over_experiments(self.wizard().group_analysis))
-        btn_fit.clicked.connect(result_plot.show_decay_exponential_fitting)
+        btn_fit.clicked.connect(lambda: result_plot.show_decay_exponential_fitting(self.wizard().group_analysis))
         btn_param.clicked.connect(result_plot.show_tau_param_over_time)
         btn_amp.clicked.connect(result_plot.show_amplitudes_over_time)
 
@@ -644,8 +644,70 @@ class PlotCanvas(FigureCanvas):
         self.fig.tight_layout()
         self.draw()
 
-    def show_decay_exponential_fitting(self):
-        pass
+    def show_decay_exponential_fitting(self, group_analysis, replicate_time_point=0):
+        """
+        Plots post-peak IT decays, mean trace, exponential fit, 95% CI, and half-life on the embedded canvas.
+        """
+        from scipy.stats import t
+        import numpy as np
+
+        # Get fit and aligned ITs from group_analysis
+        result = group_analysis.exponential_fitting_replicated(replicate_time_point)
+        if result is None:
+            self.axes.clear()
+            self.axes.set_title("No data to fit")
+            self.draw()
+            return
+
+        time_all, cropped_ITs, _, t_half, popt, pcov, A_fit, tau_fit, C_fit = result
+        n_exps, n_post = cropped_ITs.shape
+        t_rel = np.arange(n_post)
+        mean_IT = np.nanmean(cropped_ITs, axis=0)
+        std_IT  = np.nanstd (cropped_ITs, axis=0)
+        t_fit_rel = np.linspace(0, n_post-1, 500)
+        y_fit     = A_fit * np.exp(-t_fit_rel / tau_fit) + C_fit
+
+        # 95% CI of the fit via Jacobian
+        dof  = max(0, len(time_all) - len(popt))
+        tval = t.ppf(0.975, dof)
+        J        = np.empty((len(t_fit_rel), 3))
+        J[:, 0]  = np.exp(-t_fit_rel / tau_fit)
+        J[:, 1]  = A_fit * (t_fit_rel / tau_fit**2) * np.exp(-t_fit_rel / tau_fit)
+        J[:, 2]  = 1
+        ci       = np.sqrt(np.sum((J @ pcov) * J, axis=1)) * tval
+        lower_ci = y_fit - ci
+        upper_ci = y_fit + ci
+
+        # Plot on the embedded axes
+        self.axes.clear()
+
+        # a) each replicate in light gray
+        for row in cropped_ITs:
+            self.axes.plot(t_rel, row, color='gray', alpha=0.3, lw=1, label='_nolegend_')
+
+        # b) mean ± 1 SD ribbon
+        self.axes.fill_between(t_rel, mean_IT - std_IT, mean_IT + std_IT, color='C0', alpha=0.2, label='Mean ± 1 SD')
+
+        # c) mean trace
+        self.axes.plot(t_rel, mean_IT, color='C0', lw=2, label='Mean trace')
+
+        # d) fitted exponential curve
+        self.axes.plot(t_fit_rel, y_fit, color='C1', lw=2, label='Exp fit')
+
+        # e) 95% CI around the fit
+        self.axes.fill_between(t_fit_rel, lower_ci, upper_ci, color='C1', alpha=0.3, label='95% CI')
+
+        # f) half-life marker
+        self.axes.axvline(t_half, color='magenta', ls='--', label=f't½ ≈ {t_half:.1f} pts')
+
+        # 7) labels & styling
+        self.axes.set_xlabel('Time since peak (points)', fontsize=12)
+        self.axes.set_ylabel('Current (nA)', fontsize=12)
+        self.axes.set_title('Post-peak IT decays & exponential fit', fontsize=14)
+        self.axes.legend(frameon=False)
+        self.axes.grid(False)
+        self.fig.tight_layout()
+        self.draw()
 
     def show_tau_param_over_time(self):
         pass
