@@ -5,6 +5,7 @@ from mpl_toolkits.mplot3d import Axes3D  # Needed for 3D plotting
 from matplotlib import cm
 from dataclasses import dataclass, field
 from typing import List
+import os
 
 from matplotlib.animation import FuncAnimation
 
@@ -99,7 +100,7 @@ class SpheroidFile:
         vmax = np.percentile(processed_data, 99)
 
         # Create and save plot
-        fig, ax = plt.subplots(figsize=(10, 6))
+        fig, ax = plt.subplots(figsize=(10, 6), constrained_layout=True)
         im = ax.imshow(processed_data.T,  # Transpose to match time points and voltage steps, imshow expects (y, x)
                        aspect='auto',
                        cmap=custom_cmap,
@@ -108,16 +109,20 @@ class SpheroidFile:
                                0, processed_data.shape[1]],
                        vmin=vmin,
                        vmax=vmax)
-        plt.colorbar(im, ax=ax, label="Current (nA)")
+        cbar = fig.colorbar(im, ax=ax, label="Current (nA)")
         ax.set_xlabel("Time Points")
         ax.set_ylabel("Voltage Steps")
         ax.set_title(
             f"Color Plot{': ' + title_suffix if title_suffix else ''}\nRange: [{vmin:.2f}, {vmax:.2f}] nA")
 
-        plt.tight_layout()
+        #plt.tight_layout()
 
         if save_path:
-            plt.savefig(save_path, dpi=300, bbox_inches='tight')
+            output_folder = os.path.join(save_path, "plots")
+            os.makedirs(output_folder, exist_ok=True)
+            base_name = os.path.splitext(os.path.basename(self.filepath))[0]  # Remove .txt
+            output_file = os.path.join(output_folder, base_name + "_CP" +".png")
+            fig.savefig(output_file, dpi=300, bbox_inches='tight')
             plt.close(fig)
         else:
             plt.show()
@@ -286,25 +291,44 @@ class SpheroidFile:
         fig, ax = plt.subplots(figsize=(10, 6))
         ax.plot(profile, color='blue', linewidth=1.5, label="I-T Profile")
 
-        # Highlight all peak positions if available in metadata
-        if 'peak_amplitude_positions' in self.metadata:
-            peak_indices = self.metadata['peak_amplitude_positions']
-            peak_values = self.metadata.get(
-                'peak_amplitude_values', profile[peak_indices])
-            print(f"Peak indices from metadata: {peak_indices}")
-            # Iterate over index-value pairs
-            for peak_idx, peak_val in zip(peak_indices, peak_values):
-                # Check the peak is within bounds
-                if 0 <= peak_idx < len(profile):
-                    ax.scatter(peak_idx, peak_val, color='red',
-                               label="Peak Amplitude", zorder=5)
-                    ax.annotate(f"({peak_idx}, {peak_val:.2f})",
-                                (peak_idx, peak_val),
-                                textcoords="offset points",
-                                xytext=(10, 10),
-                                ha='center',
-                                fontsize=10,
-                                color='red')
+        # Robustly handle peak markers if available in metadata
+        peak_indices = self.metadata.get('peak_amplitude_positions', None)
+        peak_values = self.metadata.get('peak_amplitude_values', None)
+        if peak_indices is not None:
+            # If peak_values is None, use profile[peak_indices]
+            if peak_values is None:
+                try:
+                    peak_values = profile[peak_indices]
+                except Exception:
+                    peak_values = None
+            # Handle both single value and list/array for peaks
+            if isinstance(peak_indices, (list, np.ndarray)) and isinstance(peak_values, (list, np.ndarray)):
+                for idx, val in zip(peak_indices, peak_values):
+                    if 0 <= idx < len(profile):
+                        ax.scatter(idx, val, color='red', label="Peak Amplitude", zorder=5)
+                        ax.annotate(f"({idx}, {val:.2f})",
+                                    (idx, val),
+                                    textcoords="offset points",
+                                    xytext=(10, 10),
+                                    ha='center',
+                                    fontsize=10,
+                                    color='red')
+            else:
+                # Assume single value
+                try:
+                    idx = int(peak_indices)
+                    val = float(peak_values)
+                    if 0 <= idx < len(profile):
+                        ax.scatter(idx, val, color='red', label="Peak Amplitude", zorder=5)
+                        ax.annotate(f"({idx}, {val:.2f})",
+                                    (idx, val),
+                                    textcoords="offset points",
+                                    xytext=(10, 10),
+                                    ha='center',
+                                    fontsize=10,
+                                    color='red')
+                except Exception:
+                    pass
 
         # Add labels, title, and grid
         ax.set_xlabel("Time Points")
@@ -315,7 +339,11 @@ class SpheroidFile:
 
         # Show the plot
         if save_path:
-            plt.savefig(save_path, dpi=300, bbox_inches='tight')
+            output_folder = os.path.join(save_path, "plots")
+            os.makedirs(output_folder, exist_ok=True)
+            base_name = os.path.splitext(os.path.basename(self.filepath))[0]  # Remove .txt
+            output_file = os.path.join(output_folder, base_name + "_IT" + ".png")
+            plt.savefig(output_file, dpi=300, bbox_inches='tight')
             plt.close(fig)
         else:
             plt.show()

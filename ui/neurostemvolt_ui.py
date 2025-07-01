@@ -30,9 +30,9 @@ class IntroPage(QWizardPage):
 
         # 1) Add the ListWidget & “Load” button
         self.list_widget = QListWidget()
-        self.btn_new = QPushButton("Clear Replicates.")
+        self.btn_new = QPushButton("Clear Replicates")
         self.btn_new.clicked.connect(self.clear_replicates)
-        self.btn_load = QPushButton("Load Replicate.")
+        self.btn_load = QPushButton("Load Replicates")
         self.btn_load.clicked.connect(self.load_replicate)
         self.btn_exp_settings = QPushButton("Experiment Settings")
         self.btn_exp_settings.clicked.connect(self.show_experiment_settings_dialog)
@@ -115,6 +115,7 @@ class ExperimentSettingsDialog(QDialog):
             "file_type":             self.qsettings.value("file_type",             "None", type=str),
             # stim_params might be stored as JSON
             "stim_params":           json.loads(self.qsettings.value("stim_params", "{}")),
+            "output_folder": self.qsettings.value("output_folder", "", type=str),
         }
 
         vbox = QVBoxLayout()
@@ -140,6 +141,14 @@ class ExperimentSettingsDialog(QDialog):
         # store loaded stim_params so get_settings() can return it if user doesn’t change it
         self.stim_params = defaults["stim_params"]
 
+        h_output = QHBoxLayout()
+        self.le_output_folder = QLineEdit(defaults["output_folder"])
+        btn_browse_output = QPushButton("Browse...")
+        btn_browse_output.clicked.connect(self.browse_output_folder)
+        h_output.addWidget(self.le_output_folder)
+        h_output.addWidget(btn_browse_output)
+        form.addRow("Output Folder:", h_output)
+
         self.setLayout(vbox)
 
         # Add dialog buttons
@@ -147,6 +156,11 @@ class ExperimentSettingsDialog(QDialog):
         vbox.addWidget(buttons)
         buttons.accepted.connect(self.handle_accept)
         buttons.rejected.connect(self.reject)
+
+    def browse_output_folder(self):
+        folder = QFileDialog.getExistingDirectory(self, "Select Output Folder")
+        if folder:
+            self.le_output_folder.setText(folder)
 
     def handle_accept(self):
         # if they choose stimulation, pop the sub-dialog
@@ -166,6 +180,7 @@ class ExperimentSettingsDialog(QDialog):
         self.qsettings.setValue("time_between_files",    int(self.le_time_btw.text()))
         self.qsettings.setValue("files_before_treatment",int(self.le_files_before.text()))
         self.qsettings.setValue("file_type",             self.cb_file_type.currentText())
+        self.qsettings.setValue("output_folder", self.le_output_folder.text())
         # stim_params → JSON string
         print("Saving stim_params:", self.stim_params)
         self.qsettings.setValue("stim_params", json.dumps(self.stim_params))
@@ -184,7 +199,8 @@ class ExperimentSettingsDialog(QDialog):
             "time_between_files":     float(self.le_time_btw.text()),
             "files_before_treatment": int(self.le_files_before.text()),
             "file_type":              self.cb_file_type.currentText(),
-            "stim_params":            self.stim_params,    # you initialized this in __init__
+            "stim_params":            self.stim_params,    # initialized in __init__
+            "output_folder": self.le_output_folder.text(),
         }
 
 class StimParamsDialog(QDialog):
@@ -243,7 +259,9 @@ class ColorPlotPage(QWizardPage):
 
         btn_filter = QPushButton("Filter Options"); #btn_apply = QPushButton("Apply Filtering")
         btn_filter.clicked.connect(self.show_processing_options)
-        btn_save = QPushButton("Save Plots"); btn_export = QPushButton("Export Results")
+        btn_save = QPushButton("Save Current Plots"); 
+        btn_save.clicked.connect(self.save_IT_ColorPlot)
+        btn_export = QPushButton("Export Results")
 
         left = QVBoxLayout()
         left.addWidget(btn_revert)
@@ -362,6 +380,13 @@ class ColorPlotPage(QWizardPage):
                 for name in selected_names
                 if ProcessingOptionsDialog.get_processor_instance(name, peak_pos) is not None
             ]
+
+    def save_IT_ColorPlot(self):
+        exp = self.wizard().group_analysis.get_single_experiments(self.current_rep_index)
+        sph_file = exp.get_spheroid_file(self.current_file_index)
+        output_folder_path = QSettings("HashemiLab", "NeuroStemVolt").value("output_folder")
+        sph_file.visualize_color_plot_data(title_suffix = "", save_path=output_folder_path)
+        sph_file.visualize_IT_profile(QSettings("HashemiLab", "NeuroStemVolt").value("output_folder"))
 
 class ProcessingOptionsDialog(QDialog):
     def __init__(self, parent=None, defaults=None):
