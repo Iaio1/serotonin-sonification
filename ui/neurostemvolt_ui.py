@@ -531,6 +531,7 @@ class PlotCanvas(FigureCanvas):
         title = f"Color Plot{': ' + title_suffix if title_suffix else ''}\nRange: [{vmin:.2f}, {vmax:.2f}] nA"
         self.axes.set_title(title)
 
+        self.fig.tight_layout()
         self.draw()
 
     def plot_IT(self,processed_data, metadata=None, peak_position=None):
@@ -582,5 +583,6 @@ class PlotCanvas(FigureCanvas):
         self.axes.grid(True)
         self.axes.legend()
 
+        #self.fig.tight_layout()
         # Render to canvas
         self.draw()
