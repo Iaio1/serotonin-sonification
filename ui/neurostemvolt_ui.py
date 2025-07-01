@@ -493,6 +493,15 @@ class ResultsPage(QWizardPage):
 
         # Result plot & export
         result_plot = PlotCanvas(self, width=5, height=4)
+        if btn_avg.clicked.connect():
+            self.result_plot.show_average_over_experiments()
+        elif btn_fit.clicked.connect():
+            self.result_plot.show_decay_exponential_fitting()
+        elif btn_param.clicked.connect():
+            self.result_plot.show_tau_param_over_time()
+        elif btn_amp.clicked.connect():
+            self.result_plot.show_amplitudes_over_time() 
+            
         #result_plot.plot_line()
         btn_save = QPushButton("Save Plot"); btn_export = QPushButton("Export All")
 
@@ -603,3 +612,15 @@ class PlotCanvas(FigureCanvas):
         #self.fig.tight_layout()
         # Render to canvas
         self.draw()
+
+    def show_average_over_experiments(self):
+        pass
+
+    def show_decay_exponential_fitting(self):
+        pass
+
+    def show_tau_param_over_time(self):
+        pass
+
+    def show_amplitudes_over_time(self):
+        pass
