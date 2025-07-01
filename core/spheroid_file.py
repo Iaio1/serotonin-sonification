@@ -64,7 +64,8 @@ class SpheroidFile:
     
     def set_processed_data_as_original(self):
         self.processed_data = self.raw_data
-        self.metadata = None
+        self.metadata['peak_amplitude_positions'] = None
+        self.metadata['peak_amplitude_values'] = None
     
     def get_processed_data_IT(self):
         """

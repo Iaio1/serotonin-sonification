@@ -238,7 +238,7 @@ class ColorPlotPage(QWizardPage):
 
         #### Handle the signal from prev and next btn
 
-        btn_filter = QPushButton("Filter Options"); btn_apply = QPushButton("Apply Filtering")
+        btn_filter = QPushButton("Filter Options"); #btn_apply = QPushButton("Apply Filtering")
         btn_save = QPushButton("Save Plots"); btn_export = QPushButton("Export Results")
 
         left = QVBoxLayout()
@@ -251,7 +251,7 @@ class ColorPlotPage(QWizardPage):
     
         left.addLayout(nav)
         left.addWidget(btn_filter)
-        left.addWidget(btn_apply)
+        #left.addWidget(btn_apply)
         left.addWidget(btn_save)
         left.addWidget(btn_export)
         left.addStretch(1)

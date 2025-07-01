@@ -12,4 +12,3 @@ wizard.addPage(ColorPlotPage())
 wizard.addPage(ResultsPage())
 wizard.show()
 sys.exit(app.exec_())
-
