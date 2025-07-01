@@ -60,6 +60,8 @@ class SpheroidExperiment:
         if processors is None:
             self.processors = [
                 BackgroundSubtraction(region=(0, 10)),
+                #GaussianSmoothing2D(),
+                #RollingMean(),
                 ButterworthFilter(),
                 #SavitzkyGolayFilter(w=20, p=2),
                 BaselineCorrection(),
@@ -123,6 +125,12 @@ class SpheroidExperiment:
         """
         for spheroid_file in self.files:
             spheroid_file.set_processed_data_as_original()
+
+    def set_processing_steps(self, processors = None):
+        self.processors = processors
+
+    def get_processing_steps(self):
+        return self.processors
 
     def run(self):
         """
