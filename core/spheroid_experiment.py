@@ -41,7 +41,8 @@ class SpheroidExperiment:
         stim_params=None,
         processors=None,  # Default to None
         time_between_files= 10.0, # Default time between files (between stimulations and recodings (e.g. stimulating every 10 min and recoding) in minutes
-        files_before_treatment = 3  # Default number of files before treatment (e.g. baseline recordings)
+        files_before_treatment = 3,  # Default number of files before treatment (e.g. baseline recordings)
+        file_type = None
     ):
         if waveform is None:
             self.waveform = "5HT" # Default waveform   
@@ -55,6 +56,7 @@ class SpheroidExperiment:
         self.treatment = treatment
         self.time_between_files = time_between_files
         self.files_before_treatment = files_before_treatment
+        self.file_type = file_type
 
         # Initialize processors after acquisition_frequency is set
         if processors is None:
@@ -105,7 +107,7 @@ class SpheroidExperiment:
         return self.acquisition_frequency
     
     def get_file_time_points(self):
-        return self.file_length * self.acquisition_frequency
+        return int(self.file_length) * int(self.acquisition_frequency)
     
     def get_number_of_files_before_treatment(self):
         return self.files_before_treatment

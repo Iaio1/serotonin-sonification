@@ -78,8 +78,9 @@ class IntroPage(QWizardPage):
         if not paths:
             # optional: warn “no .txt found”
             return
-    
-        exp = SpheroidExperiment(paths,settings)
+
+        filtered = {k: v for k, v in settings.items() if k != "output_folder"}
+        exp = SpheroidExperiment(paths,**filtered)
         
         self.group_analysis.add_experiment(exp)
         # store it and show it in the list
@@ -261,10 +262,11 @@ class ColorPlotPage(QWizardPage):
         btn_filter = QPushButton("Filter Options"); #btn_apply = QPushButton("Apply Filtering")
         btn_filter.clicked.connect(self.show_processing_options)
         btn_save = QPushButton("Save Current Plots"); 
-        btn_save.clicked.connect(self.save_IT_ColorPlot)
+        btn_save.clicked.connect(self.save_IT_ColorPlot_Plots)
         btn_export = QPushButton("Export Current IT")
         btn_export.clicked.connect(self.save_processed_data_IT)
         btn_export_all = QPushButton("Export All ITs")
+        btn_export_all.clicked.connect(self.save_all_ITs)
 
         left = QVBoxLayout()
         left.addWidget(btn_revert)
@@ -385,7 +387,12 @@ class ColorPlotPage(QWizardPage):
                 if ProcessingOptionsDialog.get_processor_instance(name, peak_pos) is not None
             ]
 
-    def save_IT_ColorPlot(self):
+    def save_all_ITs(self):
+        group_analysis = self.wizard().group_analysis
+        output_folder_path = QSettings("HashemiLab", "NeuroStemVolt").value("output_folder")
+        OutputManager.save_all_ITs(group_analysis, output_folder_path)
+
+    def save_IT_ColorPlot_Plots(self):
         exp = self.wizard().group_analysis.get_single_experiments(self.current_rep_index)
         sph_file = exp.get_spheroid_file(self.current_file_index)
         output_folder_path = QSettings("HashemiLab", "NeuroStemVolt").value("output_folder")
