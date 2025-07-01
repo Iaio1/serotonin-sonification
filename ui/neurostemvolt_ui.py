@@ -255,19 +255,19 @@ class ColorPlotPage(QWizardPage):
         left.addStretch(1)
 
         # Right plots
-        main_plot = PlotCanvas(self, width=5, height=4)
-        main_plot.plot_color()
-        it_plot = PlotCanvas(self, width=2.5, height=2)
-        it_plot.plot_line()
-        cv_plot = PlotCanvas(self, width=2.5, height=2)
-        cv_plot.plot_line()
+        self.main_plot = PlotCanvas(self, width=5, height=4)
+
+        self.it_plot = PlotCanvas(self, width=2.5, height=2)
+
+        #cv_plot = PlotCanvas(self, width=2.5, height=2)
+        #cv_plot.plot_line()
 
         bottom = QHBoxLayout()
-        bottom.addWidget(it_plot)
-        bottom.addWidget(cv_plot)
+        bottom.addWidget(self.it_plot)
+        #bottom.addWidget(cv_plot)
 
         right = QVBoxLayout()
-        right.addWidget(main_plot)
+        right.addWidget(self.main_plot)
         right.addLayout(bottom)
 
         layout = QHBoxLayout()
@@ -291,6 +291,14 @@ class ColorPlotPage(QWizardPage):
         current_file_name = os.path.basename(current_file.get_filepath())
 
         self.txt_file.setText(current_file_name)
+
+        group_analysis = self.wizard().group_analysis
+        processed_data = current_file.get_processed_data()
+        metadata = current_file.get_metadata()
+        peak_pos = QSettings("HashemiLab", "NeuroStemVolt").value("peak_position")
+
+        self.main_plot.plot_color(processed_data=processed_data)
+        self.it_plot.plot_IT(processed_data=processed_data,metadata=metadata,peak_position=peak_pos)
     
     def on_replicate_changed(self, index):
         self.current_rep_index = index
@@ -301,9 +309,17 @@ class ColorPlotPage(QWizardPage):
         group_analysis = self.wizard().group_analysis
         try:
             exp = group_analysis.get_single_experiments(self.current_rep_index)
+            #exp.run()
             sph_file = exp.get_spheroid_file(self.current_file_index)
             file_name = os.path.basename(sph_file.get_filepath())
             self.txt_file.setText(file_name)
+
+            processed_data = sph_file.get_processed_data()
+            metadata = sph_file.get_metadata()
+            peak_pos = QSettings("HashemiLab", "NeuroStemVolt").value("peak_position")
+
+            self.main_plot.plot_color(processed_data=processed_data)
+            self.it_plot.plot_IT(processed_data=processed_data,metadata=metadata,peak_position=peak_pos)
         except IndexError:
             self.txt_file.setText("No file at this index")
 
@@ -341,7 +357,7 @@ class ResultsPage(QWizardPage):
 
         # Result plot & export
         result_plot = PlotCanvas(self, width=5, height=4)
-        result_plot.plot_line()
+        #result_plot.plot_line()
         btn_save = QPushButton("Save Plot"); btn_export = QPushButton("Export All")
 
         right = QVBoxLayout()
@@ -359,20 +375,94 @@ class ResultsPage(QWizardPage):
 class PlotCanvas(FigureCanvas):
     def __init__(self, parent=None, width=5, height=4, dpi=100):
         fig = Figure(figsize=(width, height), dpi=dpi)
-        self.axes = fig.add_subplot(111)
+        self.fig = fig
+        self.axes = fig.add_subplot(111)  # self.axes = self.ax if you prefer
         super().__init__(fig)
         self.setParent(parent)
         fig.tight_layout()
+        # don’t touch fig.colorbar!
+        self.cbar = None
 
-    def plot_color(self):
-        data = np.random.rand(10, 10)
-        self.axes.clear()
-        self.axes.imshow(data, aspect='auto', cmap='viridis')
+    def plot_color(self, processed_data, title_suffix=None):
+        from core.spheroid_file import PLOT_SETTINGS  # Ensure it's correctly imported
+
+        plot_settings = PLOT_SETTINGS()
+        custom_cmap = plot_settings.custom
+
+        vmin = np.percentile(processed_data, 1)
+        vmax = np.percentile(processed_data, 99)
+
+        self.fig.clear()
+        self.axes = self.fig.add_subplot(111)
+
+        im = self.axes.imshow(
+            processed_data.T,       # Transpose to align voltage steps as rows
+            aspect='auto',
+            cmap=custom_cmap,
+            origin='lower',
+            extent=[0, processed_data.shape[0], 0, processed_data.shape[1]],
+            vmin=vmin,
+            vmax=vmax
+        )
+
+        # Add colorbar using the figure object (Qt-safe)
+        self.cbar = self.fig.colorbar(im, ax=self.axes, label="Current (nA)")
+
+        self.axes.set_xlabel("Time Points")
+        self.axes.set_ylabel("Voltage Steps")
+        title = f"Color Plot{': ' + title_suffix if title_suffix else ''}\nRange: [{vmin:.2f}, {vmax:.2f}] nA"
+        self.axes.set_title(title)
+
         self.draw()
 
-    def plot_line(self):
-        t = np.linspace(0, 5, 100)
-        y = np.exp(-t) * (1 + 0.1 * np.random.randn(len(t)))
+    def plot_IT(self,processed_data, metadata=None, peak_position=None):
+        """
+        Plot the I-T (Intensity-Time) profile on the Qt canvas.
+
+        Parameters:
+        - profile: 1D numpy array representing current over time
+        - metadata: dict containing 'peak_amplitude_positions' and optionally 'peak_amplitude_values'
+        - peak_position: optional, used for labeling the title
+        """
         self.axes.clear()
-        self.axes.plot(t, y)
+
+        profile = processed_data[:, peak_position]
+
+        # Plot the main profile
+        self.axes.plot(profile, label="I-T Profile", color='blue', linewidth=1.5)
+
+        # Plot peak markers if metadata is provided
+        if metadata and 'peak_amplitude_positions' in metadata:
+            peak_indices = metadata['peak_amplitude_positions']
+            peak_values = metadata.get('peak_amplitude_values', profile[peak_indices])
+            # Handle both single value and list/array for peaks
+            if isinstance(peak_indices, (list, np.ndarray)) and isinstance(peak_values, (list, np.ndarray)):
+                for idx, val in zip(peak_indices, peak_values):
+                    if 0 <= idx < len(profile):
+                        self.axes.scatter(idx, val, color='red', zorder=5)
+                        self.axes.annotate(f"{val:.2f}", (idx, val), textcoords="offset points",
+                                           xytext=(0, 10), ha='center', fontsize=9, color='red')
+            else:
+                # Assume single value
+                try:
+                    idx = int(peak_indices)
+                    val = float(peak_values)
+                    if 0 <= idx < len(profile):
+                        self.axes.scatter(idx, val, color='red', zorder=5)
+                        self.axes.annotate(f"{val:.2f}", (idx, val), textcoords="offset points",
+                                           xytext=(0, 10), ha='center', fontsize=9, color='red')
+                except Exception:
+                    pass
+
+        # Axis labeling and formatting
+        self.axes.set_xlabel("Time Points")
+        self.axes.set_ylabel("Current (nA)")
+        title = "I-T Profile"
+        if peak_position is not None:
+            title += f" at Peak Position {peak_position}"
+        self.axes.set_title(title)
+        self.axes.grid(True)
+        self.axes.legend()
+
+        # Render to canvas
         self.draw()
