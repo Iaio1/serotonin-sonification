@@ -493,15 +493,12 @@ class ResultsPage(QWizardPage):
 
         # Result plot & export
         result_plot = PlotCanvas(self, width=5, height=4)
-        if btn_avg.clicked.connect():
-            self.result_plot.show_average_over_experiments()
-        elif btn_fit.clicked.connect():
-            self.result_plot.show_decay_exponential_fitting()
-        elif btn_param.clicked.connect():
-            self.result_plot.show_tau_param_over_time()
-        elif btn_amp.clicked.connect():
-            self.result_plot.show_amplitudes_over_time() 
-            
+        # Connect analysis buttons to their respective methods
+        btn_avg.clicked.connect(lambda: result_plot.show_average_over_experiments(self.wizard().group_analysis))
+        btn_fit.clicked.connect(result_plot.show_decay_exponential_fitting)
+        btn_param.clicked.connect(result_plot.show_tau_param_over_time)
+        btn_amp.clicked.connect(result_plot.show_amplitudes_over_time)
+
         #result_plot.plot_line()
         btn_save = QPushButton("Save Plot"); btn_export = QPushButton("Export All")
 
@@ -613,8 +610,39 @@ class PlotCanvas(FigureCanvas):
         # Render to canvas
         self.draw()
 
-    def show_average_over_experiments(self):
-        pass
+    def show_average_over_experiments(self, group_analysis):
+        """
+        Plots the mean amplitudes over time across all experiments,
+        with the standard deviation as a shaded area.
+        """
+        import numpy as np
+
+        # Get data from group_analysis
+        time_points, mean_amplitudes, all_amplitudes, files_before_treatment = group_analysis.amplitudes_over_time_all_experiments()
+        if time_points is None:
+            self.axes.clear()
+            self.axes.set_title("No data to plot")
+            self.draw()
+            return
+
+        all_amplitudes = np.array(all_amplitudes, dtype=float)
+        std_amplitudes = np.nanstd(all_amplitudes, axis=0)
+
+        # Clear and plot
+        self.axes.clear()
+        self.axes.plot(time_points, mean_amplitudes, label='Mean Amplitude', color='purple')
+        self.axes.fill_between(time_points, mean_amplitudes - std_amplitudes, mean_amplitudes + std_amplitudes,
+                            color='purple', alpha=0.2, label='SD')
+        if files_before_treatment > 0:
+            treatment_time = files_before_treatment * (time_points[1] - time_points[0])
+            self.axes.axvline(x=treatment_time, color='red', linestyle='--', label='Treatment Start')
+        self.axes.set_xlabel('Time (minutes)')
+        self.axes.set_ylabel('Amplitude')
+        self.axes.set_title('Mean Amplitude Over Time (All Experiments)')
+        self.axes.legend()
+        self.axes.grid(True)
+        self.fig.tight_layout()
+        self.draw()
 
     def show_decay_exponential_fitting(self):
         pass
