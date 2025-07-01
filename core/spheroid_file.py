@@ -62,6 +62,10 @@ class SpheroidFile:
         """
         return self.processed_data
     
+    def set_processed_data_as_original(self):
+        self.processed_data = self.raw_data
+        self.metadata = None
+    
     def get_processed_data_IT(self):
         """
         Returns the processed data for the I-T profile.

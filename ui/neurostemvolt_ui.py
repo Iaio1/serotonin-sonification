@@ -215,8 +215,10 @@ class ColorPlotPage(QWizardPage):
         self.setTitle("Color Plot")
     
         # Left controls
-        btn_back = QPushButton("Back")
+        btn_revert = QPushButton("Revert Changes")
+        btn_revert.clicked.connect(self.revert_processing)
         btn_eval = QPushButton("Evaluate")
+        btn_eval.clicked.connect(self.run_processing)
 
         self.cbo_rep = QComboBox(); 
         self.cbo_rep.currentIndexChanged.connect(self.on_replicate_changed)
@@ -240,7 +242,7 @@ class ColorPlotPage(QWizardPage):
         btn_save = QPushButton("Save Plots"); btn_export = QPushButton("Export Results")
 
         left = QVBoxLayout()
-        left.addWidget(btn_back)
+        left.addWidget(btn_revert)
         left.addWidget(btn_eval)
         left.addWidget(self.cbo_rep)
         left.addWidget(self.txt_file)
@@ -309,7 +311,6 @@ class ColorPlotPage(QWizardPage):
         group_analysis = self.wizard().group_analysis
         try:
             exp = group_analysis.get_single_experiments(self.current_rep_index)
-            #exp.run()
             sph_file = exp.get_spheroid_file(self.current_file_index)
             file_name = os.path.basename(sph_file.get_filepath())
             self.txt_file.setText(file_name)
@@ -333,6 +334,18 @@ class ColorPlotPage(QWizardPage):
         if self.current_file_index > 0:
             self.current_file_index -= 1
             self.update_file_display()
+
+    def run_processing(self):
+        group_analysis = self.wizard().group_analysis
+        for exp in group_analysis.get_experiments():
+            exp.run()
+        self.update_file_display()
+
+    def revert_processing(self):
+        group_analysis = self.wizard().group_analysis
+        for exp in group_analysis.get_experiments():
+            exp.revert_processing()
+        self.update_file_display()
 
 ### Third Page
 

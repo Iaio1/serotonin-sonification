@@ -116,6 +116,13 @@ class SpheroidExperiment:
 
     def get_time_between_files(self):
         return self.time_between_files
+    
+    def revert_processing(self):
+        """
+        This method returns processed_data to original
+        """
+        for spheroid_file in self.files:
+            spheroid_file.set_processed_data_as_original()
 
     def run(self):
         """
