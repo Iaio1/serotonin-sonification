@@ -66,13 +66,6 @@ class IntroPage(QWizardPage):
         # Also clear our own display_names_list
         self.display_names_list = []
 
-        # now find the ColorPlotPage and clear it
-        for pid in wiz.pageIds():
-            page = wiz.page(pid)
-            if isinstance(page, ColorPlotPage):
-                page.clear_all()
-                break
-
     def load_replicate(self):
         """Ask the user to pick a folder, build & run the SpheroidExperiment, and display it."""
         
@@ -102,7 +95,13 @@ class IntroPage(QWizardPage):
         self.display_names_list.append(f"{os.path.basename(folder)}")
         display_name = f"{os.path.basename(folder)}"
         self.list_widget.addItem(display_name)
-        
+
+        wiz = self.wizard()
+        wiz.group_analysis = self.group_analysis
+        wiz.display_names_list = self.display_names_list
+        # if your Next button is gated on isComplete(), let Qt know the page state changed:
+        self.completeChanged.emit()
+
     def validatePage(self):
         """
         This is called automatically when the user clicks 'Continue'.
@@ -545,6 +544,8 @@ class ResultsPage(QWizardPage):
         btn_export = QPushButton("Export metrics as csv")
         btn_export.clicked.connect(self.export_all_as_csv)
 
+        self.analysis_buttons = [btn_avg, btn_fit, btn_param, btn_amp, btn_save, btn_save_all, btn_export]
+
         right = QVBoxLayout()
         right.addWidget(self.result_plot)
         right.addWidget(btn_save)
@@ -609,6 +610,24 @@ class ResultsPage(QWizardPage):
         # Add more OutputManager plot saves as needed
 
         QMessageBox.information(self, "Plots Saved", f"All group-level plots saved to:\n{os.path.join(output_folder, 'plots')}")
+    
+    def initializePage(self):
+        if self.wizard().group_analysis.get_experiments():
+            self.enable_analysis_buttons()
+        else:
+            self.clear_all()
+
+    def clear_all(self):
+        # Clear the plot
+        self.result_plot.fig.clear()
+        self.result_plot.draw()
+        # Optionally disable analysis/export buttons
+        for btn in getattr(self, 'analysis_buttons', []):
+            btn.setEnabled(False)
+
+    def enable_analysis_buttons(self):
+        for btn in getattr(self, 'analysis_buttons', []):
+            btn.setEnabled(True)
 
 class PlotCanvas(FigureCanvas):
     def __init__(self, parent=None, width=5, height=4, dpi=100):
@@ -664,7 +683,7 @@ class PlotCanvas(FigureCanvas):
         """
         self.fig.clear()
         self.axes.clear()
-        
+
         self.axes = self.fig.add_subplot(111)
 
         profile = processed_data[:, peak_position]
