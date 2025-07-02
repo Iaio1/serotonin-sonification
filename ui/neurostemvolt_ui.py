@@ -57,7 +57,22 @@ class IntroPage(QWizardPage):
         """Start a brand-new experiment group."""
         self.group_analysis.clear_experiments()
         self.list_widget.clear()
-    
+
+        # overwrite the wizard‐level shared data
+        wiz = self.wizard()
+        wiz.group_analysis        = self.group_analysis
+        wiz.display_names_list    = []
+
+        # Also clear our own display_names_list
+        self.display_names_list = []
+
+        # now find the ColorPlotPage and clear it
+        for pid in wiz.pageIds():
+            page = wiz.page(pid)
+            if isinstance(page, ColorPlotPage):
+                page.clear_all()
+                break
+
     def load_replicate(self):
         """Ask the user to pick a folder, build & run the SpheroidExperiment, and display it."""
         
@@ -311,24 +326,48 @@ class ColorPlotPage(QWizardPage):
 
         group_analysis = self.wizard().group_analysis
         display_names_list = self.wizard().display_names_list
-        
+        print(display_names_list)
+        names = self.wizard().display_names_list or []
+
         self.cbo_rep.clear()
         self.cbo_rep.addItems(display_names_list)
         self.cbo_rep.setCurrentIndex(def_index)
+        self.cbo_rep.setEnabled(True)
         
-        current_exp = group_analysis.get_single_experiments(def_index)
-        current_file = current_exp.get_spheroid_file(def_index)
-        current_file_name = os.path.basename(current_file.get_filepath())
+        if not names:
+            # no replicates → disable everything
+            self.cbo_rep.setEnabled(False)
+            self.txt_file.clear()
+            self.clear_all()   # blank the plots too
+            return
+        else:
+            current_exp = group_analysis.get_single_experiments(def_index)
+            current_file = current_exp.get_spheroid_file(def_index)
+            current_file_name = os.path.basename(current_file.get_filepath())
 
-        self.txt_file.setText(current_file_name)
+            self.txt_file.setText(current_file_name)
 
-        group_analysis = self.wizard().group_analysis
-        processed_data = current_file.get_processed_data()
-        metadata = current_file.get_metadata()
-        peak_pos = QSettings("HashemiLab", "NeuroStemVolt").value("peak_position")
+            group_analysis = self.wizard().group_analysis
+            processed_data = current_file.get_processed_data()
+            metadata = current_file.get_metadata()
+            peak_pos = QSettings("HashemiLab", "NeuroStemVolt").value("peak_position")
 
-        self.main_plot.plot_color(processed_data=processed_data)
-        self.it_plot.plot_IT(processed_data=processed_data,metadata=metadata,peak_position=peak_pos)
+            self.main_plot.plot_color(processed_data=processed_data)
+            self.it_plot.plot_IT(processed_data=processed_data,metadata=metadata,peak_position=peak_pos)
+
+    def clear_all(self):
+        # reset indices
+        self.current_rep_index = 0
+        self.current_file_index = 0
+
+        # empty the combo box & filename display
+        self.cbo_rep.clear()
+        self.txt_file.clear()
+
+        # clear both canvases
+        for canvas in (self.main_plot, self.it_plot):
+            canvas.fig.clear()
+            canvas.draw()
 
     def on_replicate_changed(self, index):
         self.current_rep_index = index
@@ -623,7 +662,10 @@ class PlotCanvas(FigureCanvas):
         - metadata: dict containing 'peak_amplitude_positions' and optionally 'peak_amplitude_values'
         - peak_position: optional, used for labeling the title
         """
+        self.fig.clear()
         self.axes.clear()
+        
+        self.axes = self.fig.add_subplot(111)
 
         profile = processed_data[:, peak_position]
 
