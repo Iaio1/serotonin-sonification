@@ -144,7 +144,7 @@ class ExperimentSettingsDialog(QDialog):
             "acquisition_frequency": self.qsettings.value("acquisition_frequency", 10,     type=int),
             "peak_position":         self.qsettings.value("peak_position",         257,    type=int),
             "treatment":             self.qsettings.value("treatment",             "None", type=str),
-            "waveform":              self.qsettings.value("waveform",              "5HT",  type=str),
+            #"waveform":              self.qsettings.value("waveform",              "5HT",  type=str),
             "time_between_files":    self.qsettings.value("time_between_files",    10,     type=int),
             "files_before_treatment":self.qsettings.value("files_before_treatment",3,      type=int),
             "file_type":             self.qsettings.value("file_type",             "None", type=str),
@@ -164,8 +164,8 @@ class ExperimentSettingsDialog(QDialog):
         self.le_peak_pos    = QLineEdit(str(defaults["peak_position"]));          form.addRow("Peak Pos:", self.le_peak_pos)
         self.le_treatment   = QLineEdit(defaults["treatment"]);                   form.addRow("Treatment:", self.le_treatment)
 
-        self.cb_waveform    = QComboBox();  self.cb_waveform.addItems(["5HT","Else"])
-        self.cb_waveform.setCurrentText(defaults["waveform"]);                     form.addRow("Waveform:", self.cb_waveform)
+        #self.cb_waveform    = QComboBox();  self.cb_waveform.addItems(["5HT","Else"])
+        #self.cb_waveform.setCurrentText(defaults["waveform"]);                     form.addRow("Waveform:", self.cb_waveform)
 
         self.le_time_btw    = QLineEdit(str(defaults["time_between_files"]));     form.addRow("Time Between Files:", self.le_time_btw)
         self.le_files_before= QLineEdit(str(defaults["files_before_treatment"])); form.addRow("Files Before Treatment:", self.le_files_before)
@@ -211,7 +211,7 @@ class ExperimentSettingsDialog(QDialog):
         self.qsettings.setValue("acquisition_frequency", int(self.le_acq_freq.text()))
         self.qsettings.setValue("peak_position",         int(self.le_peak_pos.text()))
         self.qsettings.setValue("treatment",             self.le_treatment.text())
-        self.qsettings.setValue("waveform",              self.cb_waveform.currentText())
+        #self.qsettings.setValue("waveform",              self.cb_waveform.currentText())
         self.qsettings.setValue("time_between_files",    int(self.le_time_btw.text()))
         self.qsettings.setValue("files_before_treatment",int(self.le_files_before.text()))
         self.qsettings.setValue("file_type",             self.cb_file_type.currentText())
@@ -230,7 +230,7 @@ class ExperimentSettingsDialog(QDialog):
             "acquisition_frequency":  int(self.le_acq_freq.text()),
             "peak_position":          int(self.le_peak_pos.text()),
             "treatment":              self.le_treatment.text(),
-            "waveform":               self.cb_waveform.currentText(),
+            #"waveform":               self.cb_waveform.currentText(),
             "time_between_files":     float(self.le_time_btw.text()),
             "files_before_treatment": int(self.le_files_before.text()),
             "file_type":              self.cb_file_type.currentText(),
@@ -447,7 +447,7 @@ class ColorPlotPage(QWizardPage):
         dlg = ProcessingOptionsDialog(self)
         if dlg.exec_() == QDialog.Accepted:
             selected_names = dlg.get_selected_processors()
-            peak_pos = QSettings("HashemiLab", "NeuroStemVolt").value("peak_position")
+            peak_pos = QSettings("HashemiLab", "NeuroStemVolt").value("peak_position", type=int)
             self.selected_processors = [
                 ProcessingOptionsDialog.get_processor_instance(name, peak_pos)
                 for name in selected_names
@@ -509,11 +509,15 @@ class ProcessingOptionsDialog(QDialog):
         self.checkboxes = {}
         layout = QVBoxLayout()
 
-        for name, checked in self.processor_options:
+        saved = self.qsettings.value("processing_pipeline", type=str)
+        saved_selection = json.loads(saved) if saved else []
+
+        for name, default_checked in self.processor_options:
             if name == "Find Amplitude":
                 continue
             cb = QCheckBox(name)
-            cb.setChecked(checked)
+            # Override default if saved selection exists
+            cb.setChecked(name in saved_selection if saved_selection else default_checked)
             layout.addWidget(cb)
             self.checkboxes[name] = cb
         
@@ -551,6 +555,10 @@ class ProcessingOptionsDialog(QDialog):
         """Return a list of selected processor names."""
         return [name for name, cb in self.checkboxes.items() if cb.isChecked()]
 
+    def accept(self):
+        selected = self.get_selected_processors()
+        self.qsettings.setValue("processing_pipeline", json.dumps(selected))
+        super().accept()
 
 ### Third Page
 
