@@ -533,7 +533,8 @@ class ResultsPage(QWizardPage):
         self.result_plot = PlotCanvas(self, width=5, height=4)
         # Connect analysis buttons to their respective methods
         btn_avg.clicked.connect(lambda: self.result_plot.show_average_over_experiments(self.wizard().group_analysis))
-        btn_fit.clicked.connect(lambda: self.result_plot.show_decay_exponential_fitting(self.wizard().group_analysis))
+        btn_fit.clicked.connect(self.handle_decay_fit)
+        #btn_fit.clicked.connect(lambda: self.result_plot.show_decay_exponential_fitting(self.wizard().group_analysis))
         btn_param.clicked.connect(lambda: self.result_plot.show_tau_param_over_time(self.wizard().group_analysis))
         btn_amp.clicked.connect(lambda: self.result_plot.show_amplitudes_over_time(self.wizard().group_analysis))
 
@@ -628,6 +629,36 @@ class ResultsPage(QWizardPage):
     def enable_analysis_buttons(self):
         for btn in getattr(self, 'analysis_buttons', []):
             btn.setEnabled(True)
+
+    def handle_decay_fit(self):
+        group_analysis = self.wizard().group_analysis
+        experiments = group_analysis.get_experiments()
+        if not experiments:
+            return
+        # Use the first experiment to get the list of files (timepoints)
+        exp = experiments[0]
+        file_names = [os.path.basename(exp.get_spheroid_file(i).get_filepath()) for i in range(exp.get_file_count())]
+        dlg = TimepointSelectionDialog(file_names, self)
+        if dlg.exec_() == QDialog.Accepted:
+            idx = dlg.get_selected_index()
+            self.result_plot.show_decay_exponential_fitting(group_analysis, replicate_time_point=idx)
+
+class TimepointSelectionDialog(QDialog):
+    def __init__(self, file_names, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Select Timepoint for Exponential Fit")
+        layout = QVBoxLayout(self)
+        layout.addWidget(QLabel("Select the file/timepoint to fit:"))
+        self.combo = QComboBox(self)
+        self.combo.addItems(file_names)
+        layout.addWidget(self.combo)
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+
+    def get_selected_index(self):
+        return self.combo.currentIndex()
 
 class PlotCanvas(FigureCanvas):
     def __init__(self, parent=None, width=5, height=4, dpi=100):
