@@ -2,7 +2,7 @@ from PyQt5.QtWidgets import (
     QWidget, QApplication, QWizard, QComboBox, QLineEdit, QWizardPage, QLabel, QPushButton, QVBoxLayout, QHBoxLayout,
     QListWidget, QFileDialog, QInputDialog, QGridLayout, QFormLayout, QLineEdit, QDialog, QCheckBox, QDialogButtonBox, QMessageBox
 )
-from PyQt5.QtCore import QSettings
+from PyQt5.QtCore import QSettings, Qt
 from PyQt5.QtGui import QIcon
 
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
@@ -34,20 +34,39 @@ class IntroPage(QWizardPage):
 
         # 1) Add the ListWidget & “Load” button
         self.list_widget = QListWidget()
+        apply_custom_styles(self.list_widget)
         self.btn_new = QPushButton("Clear Replicates")
+        apply_custom_styles(self.btn_new)
         self.btn_new.clicked.connect(self.clear_replicates)
         self.btn_load = QPushButton("Load Replicates")
+        apply_custom_styles(self.btn_load)
         self.btn_load.clicked.connect(self.load_replicate)
         self.btn_exp_settings = QPushButton("Experiment Settings")
+        apply_custom_styles(self.btn_exp_settings)
         self.btn_exp_settings.clicked.connect(self.show_experiment_settings_dialog)
         
         # 3) Layout
         v = QVBoxLayout()
         v.addWidget(self.btn_new)
         v.addWidget(self.btn_load)
-        v.addWidget(QLabel("Loaded Replicates:"))
+        label_loaded = QLabel("Loaded Replicates:")
+        label_loaded.setStyleSheet("""
+            color: black;
+            font-family: Helvetica;
+            font-weight: bold;
+        """)
+        footer = QLabel("© 2025 Hashemi Lab · NeuroStemVolt")
+        footer.setAlignment(Qt.AlignCenter)
+        footer.setStyleSheet("""
+            color: gray;
+            font-family: Helvetica;
+            font-size: 10pt;
+            margin-top: 12px;
+        """)
+        v.addWidget(label_loaded)
         v.addWidget(self.list_widget)
         v.addWidget(self.btn_exp_settings)
+        v.addWidget(footer)
         self.setLayout(v)
 
     def isComplete(self):
@@ -308,52 +327,64 @@ class ColorPlotPage(QWizardPage):
         self.selected_processors = []
     
         # Left controls
-        btn_revert = QPushButton("Revert Changes")
-        btn_revert.clicked.connect(self.revert_processing)
-        btn_eval = QPushButton("Evaluate")
-        btn_eval.clicked.connect(self.run_processing)
+        self.btn_revert = QPushButton("Revert Changes")
+        apply_custom_styles(self.btn_revert)
+        self.btn_revert.clicked.connect(self.revert_processing)
+        self.btn_eval = QPushButton("Evaluate")
+        apply_custom_styles(self.btn_eval)
+        self.btn_eval.clicked.connect(self.run_processing)
 
         self.cbo_rep = QComboBox(); 
+        #apply_custom_styles(self.cbo_rep)
         self.cbo_rep.currentIndexChanged.connect(self.on_replicate_changed)
         
         #### Handle the signal from cbo_rep
 
         self.txt_file = QLineEdit(); 
+        #apply_custom_styles(self.txt_file)
         self.txt_file.setReadOnly(True)
 
         # Default indexes to visualize
         self.current_rep_index = 0
         self.current_file_index = 0
 
-        btn_prev = QPushButton("Previous"); btn_next = QPushButton("Next")
-        btn_prev.clicked.connect(self.on_prev_clicked)
-        btn_next.clicked.connect(self.on_next_clicked)
+        self.btn_prev = QPushButton("Previous"); 
+        apply_custom_styles(self.btn_prev)
+        self.btn_next = QPushButton("Next")
+        apply_custom_styles(self.btn_next)
+        self.btn_prev.clicked.connect(self.on_prev_clicked)
+        self.btn_next.clicked.connect(self.on_next_clicked)
 
         #### Handle the signal from prev and next btn
 
-        btn_filter = QPushButton("Filter Options"); #btn_apply = QPushButton("Apply Filtering")
-        btn_filter.clicked.connect(self.show_processing_options)
-        btn_save = QPushButton("Save Current Plots"); 
-        btn_save.clicked.connect(self.save_IT_ColorPlot_Plots)
-        btn_export = QPushButton("Export Current IT")
-        btn_export.clicked.connect(self.save_processed_data_IT)
-        btn_export_all = QPushButton("Export All ITs")
-        btn_export_all.clicked.connect(self.save_all_ITs)
+        self.btn_filter = QPushButton("Filter Options"); 
+        apply_custom_styles(self.btn_filter)
+        #btn_apply = QPushButton("Apply Filtering")
+        self.btn_filter.clicked.connect(self.show_processing_options)
+        self.btn_save = QPushButton("Save Current Plots"); 
+        apply_custom_styles(self.btn_save)
+        self.btn_save.clicked.connect(self.save_IT_ColorPlot_Plots)
+        self.btn_export = QPushButton("Export Current IT")
+        apply_custom_styles(self.btn_export)
+        self.btn_export.clicked.connect(self.save_processed_data_IT)
+        self.btn_export_all = QPushButton("Export All ITs")
+        apply_custom_styles(self.btn_export_all)
+        self.btn_export_all.clicked.connect(self.save_all_ITs)
 
         left = QVBoxLayout()
-        left.addWidget(btn_revert)
-        left.addWidget(btn_eval)
+        left.addWidget(self.btn_revert)
+        left.addWidget(self.btn_eval)
         left.addWidget(self.cbo_rep)
         left.addWidget(self.txt_file)
 
-        nav = QHBoxLayout(); nav.addWidget(btn_prev); nav.addWidget(btn_next)
+        nav = QHBoxLayout(); nav.addWidget(self.btn_prev); nav.addWidget(self.btn_next)
     
         left.addLayout(nav)
-        left.addWidget(btn_filter)
+        left.addWidget(self.btn_filter)
         #left.addWidget(btn_apply)
-        left.addWidget(btn_save)
-        left.addWidget(btn_export)
-        left.addWidget(btn_export_all)
+        left.addWidget(self.btn_save)
+        left.addWidget(self.btn_export)
+        left.addWidget(self.btn_export_all)
         left.addStretch(1)
 
         # Right plots
@@ -620,9 +651,13 @@ class ResultsPage(QWizardPage):
 
         # Analysis buttons
         btn_avg = QPushButton("Average Over Experiments")
+        apply_custom_styles(btn_avg)
         btn_fit = QPushButton("Decay Exponential Fitting")
+        apply_custom_styles(btn_fit)
         btn_param = QPushButton("Exponential Parameter over time")
+        apply_custom_styles(btn_param)
         btn_amp = QPushButton("Amplitudes Over Time")
+        apply_custom_styles(btn_amp)
 
         analysis = QGridLayout()
         analysis.addWidget(btn_avg, 0, 0)
@@ -640,10 +675,13 @@ class ResultsPage(QWizardPage):
         btn_amp.clicked.connect(lambda: self.result_plot.show_amplitudes_over_time(self.wizard().group_analysis))
 
         btn_save = QPushButton("Save Current Plot")
+        apply_custom_styles(btn_save)
         btn_save.clicked.connect(self.save_current_plot)
         btn_save_all = QPushButton("Save All Plots")
+        apply_custom_styles(btn_save_all)
         btn_save_all.clicked.connect(self.save_all_plots)
         btn_export = QPushButton("Export metrics as csv")
+        apply_custom_styles(btn_export)
         btn_export.clicked.connect(self.export_all_as_csv)
 
         self.analysis_buttons = [btn_avg, btn_fit, btn_param, btn_amp, btn_save, btn_save_all, btn_export]
@@ -1033,3 +1071,53 @@ def make_labeled_field_with_help(label_text, widget, help_text):
     layout.addWidget(help_btn)
 
     return container
+
+def apply_custom_styles(widget):
+    if isinstance(widget, QPushButton):
+        label = widget.text().lower()
+        if "save" in label or "export" in label:
+            # Save/export buttons
+            widget.setStyleSheet("""
+                QPushButton {
+                    background-color: #00DE28;
+                    color: white;
+                    font-family: Helvetica;
+                    font-weight: bold;
+                    border-radius: 10px;
+                    padding: 6px 12px;
+                }
+            """)
+        elif "clear" in label:
+            widget.setStyleSheet("""
+                QPushButton {
+                    background-color: #FF3877;
+                    color: white;
+                    font-family: Helvetica;
+                    font-weight: bold;
+                    border-radius: 10px;
+                    padding: 6px 12px;
+                }
+            """)
+        else:
+            # General buttons
+            widget.setStyleSheet("""
+                QPushButton {
+                    background-color: #00DE97;
+                    color: white;
+                    font-family: Helvetica;
+                    font-weight: bold;
+                    border-radius: 10px;
+                    padding: 6px 12px;
+                }
+            """)
+    elif isinstance(widget, QListWidget):
+        widget.setStyleSheet("""
+            QListWidget {
+                background-color: #18D5FF;
+                color: white;
+                font-family: Helvetica;
+                font-weight: bold;
+                border-radius: 8px;
+                padding: 4px;
+            }
+        """)
