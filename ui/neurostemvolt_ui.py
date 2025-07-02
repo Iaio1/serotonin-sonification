@@ -495,7 +495,7 @@ class ResultsPage(QWizardPage):
         self.result_plot = PlotCanvas(self, width=5, height=4)
         # Connect analysis buttons to their respective methods
         btn_avg.clicked.connect(lambda: self.result_plot.show_average_over_experiments(self.wizard().group_analysis))
-        btn_fit.clicked.connect(lambda: self.esult_plot.show_decay_exponential_fitting(self.wizard().group_analysis))
+        btn_fit.clicked.connect(lambda: self.result_plot.show_decay_exponential_fitting(self.wizard().group_analysis))
         btn_param.clicked.connect(lambda: self.result_plot.show_tau_param_over_time(self.wizard().group_analysis))
         btn_amp.clicked.connect(lambda: self.result_plot.show_amplitudes_over_time(self.wizard().group_analysis))
 
@@ -504,6 +504,7 @@ class ResultsPage(QWizardPage):
         btn_save_all = QPushButton("Save All Plots")
         btn_save_all.clicked.connect(self.save_all_plots)
         btn_export = QPushButton("Export metrics as csv")
+        btn_export.clicked.connect(self.export_all_as_csv)
 
         right = QVBoxLayout()
         right.addWidget(self.result_plot)
@@ -518,8 +519,25 @@ class ResultsPage(QWizardPage):
         layout.addLayout(right)
         self.setLayout(layout)
 
-    def export_all(self):
-        pass
+    def export_all_as_csv(self):
+        """Export all relevant metrics as CSV files using OutputManager."""
+        output_folder = QSettings("HashemiLab", "NeuroStemVolt").value("output_folder")
+        group_analysis = self.wizard().group_analysis
+        if not output_folder or not os.path.isdir(output_folder):
+            QMessageBox.warning(self, "No Output Folder", "Please set a valid output folder in Experiment Settings.")
+            return
+
+        # Save all relevant CSVs using OutputManager
+        OutputManager.save_all_ITs(group_analysis, output_folder)
+        OutputManager.save_all_peak_amplitudes(group_analysis, output_folder)
+        OutputManager.save_all_reuptake_curves(group_analysis, output_folder)
+        OutputManager.save_all_exponential_fitting_params(group_analysis, output_folder)
+
+        QMessageBox.information(
+            self,
+            "CSV Export Complete",
+            f"All metrics exported as CSV files to:\n{output_folder}"
+        )
 
     def save_current_plot(self):
         """Save the currently displayed plot as a PNG file."""
