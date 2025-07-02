@@ -303,7 +303,7 @@ class StimParamsDialog(QDialog):
 class ColorPlotPage(QWizardPage):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setTitle("Color Plot")
+        #self.setTitle("Color Plot")
 
         self.selected_processors = []
     
@@ -614,7 +614,7 @@ class ProcessingOptionsDialog(QDialog):
 class ResultsPage(QWizardPage):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setTitle("Results")
+        #self.setTitle("Results")
 
         btn_back = QPushButton("Back")
 
@@ -650,13 +650,16 @@ class ResultsPage(QWizardPage):
 
         right = QVBoxLayout()
         right.addWidget(self.result_plot)
-        right.addWidget(btn_save)
-        right.addWidget(btn_save_all)
-        right.addWidget(btn_export)
         right.addStretch(1)
 
+        left = QVBoxLayout(); 
         layout = QHBoxLayout()
-        left = QVBoxLayout(); left.addWidget(btn_back); left.addLayout(analysis); left.addStretch(1)
+        #left.addWidget(btn_back); 
+        left.addLayout(analysis); 
+        left.addWidget(btn_save)
+        left.addWidget(btn_save_all)
+        left.addWidget(btn_export)
+        left.addStretch(1)
         layout.addLayout(left)
         layout.addLayout(right)
         self.setLayout(layout)
