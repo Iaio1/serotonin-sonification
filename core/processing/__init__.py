@@ -6,6 +6,8 @@ from .sav_gol import SavitzkyGolayFilter
 from .butterworth import ButterworthFilter
 from .rolling_mean import RollingMean
 from .background_subtraction import BackgroundSubtraction
+from .exponentialdecay import ExponentialFitting
+from .normalize import Normalize
 
 __all__ = [
     "RawMean",
@@ -16,4 +18,6 @@ __all__ = [
     "ButterworthFilter",
     "RollingMean",
     "BackgroundSubtraction",
+    "ExponentialFitting",
+    "Normalize"
 ]

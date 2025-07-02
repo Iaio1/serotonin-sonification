@@ -1,6 +1,6 @@
-from spheroid_experiment import SpheroidExperiment
-from processing.exponentialdecay import exp_decay
-from processing.normalize import Normalize
+from core.spheroid_experiment import SpheroidExperiment
+from core.processing.exponentialdecay import exp_decay
+from core.processing.normalize import Normalize
 import os
 import numpy as np
 
@@ -19,7 +19,7 @@ class GroupAnalysis:
             self.experiments = experiments
         else:
             raise ValueError("experiments must be None, a SpheroidExperiment, or a list of SpheroidExperiment objects.")
-        
+    
     def add_experiment(self, *experiments):
         """
         Add one or more SpheroidExperiment instances to the group analysis.
@@ -39,10 +39,11 @@ class GroupAnalysis:
 
     def get_single_experiments(self, index: int):
         """
-        Get the list of SpheroidExperiments in the group analysis.
-        :return: List of SpheroidExperiment instances.
+        Get the single experiment of SpheroidExperiments in the group analysis.
+        :return: a single SpheroidExperiment instance.
         """
         return self.experiments[index]
+    
     def get_experiments(self):
         """
         Get the list of SpheroidExperiments in the group analysis.
@@ -50,6 +51,16 @@ class GroupAnalysis:
         """
         return self.experiments
     
+    def clear_experiments(self):
+        """Remove all experiments from this group."""
+        self.experiments.clear()
+        #print("Replicates Cleared")
+        #print(self.get_experiments())
+
+    def set_processing_options_exp(self, processors = None):
+        for exp in self.experiments:
+            exp.set_processing_steps(processors)
+
     def non_normalized_first_ITs(self):
         """
         This method gets the ITs of the first stimulation per experiment (per replicate)

@@ -1,16 +1,16 @@
-from spheroid_file import SpheroidFile
-from pipeline_manager import PipelineManager
-from processing.raw_mean import RawMean
-from processing.rolling_mean import RollingMean
-from processing.butterworth import ButterworthFilter
-from processing.gaussian import GaussianSmoothing2D
-from processing.baseline_correct import BaselineCorrection
-from processing.find_amplitude import FindAmplitude
-from processing.normalize import Normalize
-from processing.sav_gol import SavitzkyGolayFilter
-from processing.background_subtraction import BackgroundSubtraction
-from processing.exponentialdecay import ExponentialFitting
-from utils import extract_timepoint
+from core.spheroid_file import SpheroidFile
+from core.pipeline_manager import PipelineManager
+from core.processing.raw_mean import RawMean
+from core.processing.rolling_mean import RollingMean
+from core.processing.butterworth import ButterworthFilter
+from core.processing.gaussian import GaussianSmoothing2D
+from core.processing.baseline_correct import BaselineCorrection
+from core.processing.find_amplitude import FindAmplitude
+from core.processing.normalize import Normalize
+from core.processing.sav_gol import SavitzkyGolayFilter
+from core.processing.background_subtraction import BackgroundSubtraction
+from core.processing.exponentialdecay import ExponentialFitting
+from core.utils import extract_timepoint
 import os
 
 class SpheroidExperiment:
@@ -41,7 +41,8 @@ class SpheroidExperiment:
         stim_params=None,
         processors=None,  # Default to None
         time_between_files= 10.0, # Default time between files (between stimulations and recodings (e.g. stimulating every 10 min and recoding) in minutes
-        files_before_treatment = 3  # Default number of files before treatment (e.g. baseline recordings)
+        files_before_treatment = 3,  # Default number of files before treatment (e.g. baseline recordings)
+        file_type = None
     ):
         if waveform is None:
             self.waveform = "5HT" # Default waveform   
@@ -55,11 +56,14 @@ class SpheroidExperiment:
         self.treatment = treatment
         self.time_between_files = time_between_files
         self.files_before_treatment = files_before_treatment
+        self.file_type = file_type
 
         # Initialize processors after acquisition_frequency is set
         if processors is None:
             self.processors = [
                 BackgroundSubtraction(region=(0, 10)),
+                #GaussianSmoothing2D(),
+                #RollingMean(),
                 ButterworthFilter(),
                 #SavitzkyGolayFilter(w=20, p=2),
                 BaselineCorrection(),
@@ -103,7 +107,7 @@ class SpheroidExperiment:
         return self.acquisition_frequency
     
     def get_file_time_points(self):
-        return self.file_length * self.acquisition_frequency
+        return int(self.file_length) * int(self.acquisition_frequency)
     
     def get_number_of_files_before_treatment(self):
         return self.files_before_treatment
@@ -116,6 +120,19 @@ class SpheroidExperiment:
 
     def get_time_between_files(self):
         return self.time_between_files
+    
+    def revert_processing(self):
+        """
+        This method returns processed_data to original
+        """
+        for spheroid_file in self.files:
+            spheroid_file.set_processed_data_as_original()
+
+    def set_processing_steps(self, processors = None):
+        self.processors = processors
+
+    def get_processing_steps(self):
+        return self.processors
 
     def run(self):
         """

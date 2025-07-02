@@ -1,4 +1,4 @@
-from processing.base import Processor  # Use relative import
+from core.processing.base import Processor  # Use relative import
 import inspect
 
 class PipelineManager:
