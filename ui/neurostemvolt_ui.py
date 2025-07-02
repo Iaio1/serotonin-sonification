@@ -1,5 +1,5 @@
 from PyQt5.QtWidgets import (
-    QApplication, QWizard, QComboBox, QLineEdit, QWizardPage, QLabel, QPushButton, QVBoxLayout, QHBoxLayout,
+    QWidget, QApplication, QWizard, QComboBox, QLineEdit, QWizardPage, QLabel, QPushButton, QVBoxLayout, QHBoxLayout,
     QListWidget, QFileDialog, QInputDialog, QGridLayout, QFormLayout, QLineEdit, QDialog, QCheckBox, QDialogButtonBox, QMessageBox
 )
 from PyQt5.QtCore import QSettings
@@ -159,18 +159,48 @@ class ExperimentSettingsDialog(QDialog):
         form = QFormLayout()
         vbox.addLayout(form)
 
-        self.le_file_length = QLineEdit(str(defaults["file_length"]));            form.addRow("File Length:", self.le_file_length)
-        self.le_acq_freq    = QLineEdit(str(defaults["acquisition_frequency"]));  form.addRow("Acquisition Freq:", self.le_acq_freq)
-        self.le_peak_pos    = QLineEdit(str(defaults["peak_position"]));          form.addRow("Peak Pos:", self.le_peak_pos)
-        self.le_treatment   = QLineEdit(defaults["treatment"]);                   form.addRow("Treatment:", self.le_treatment)
-
         #self.cb_waveform    = QComboBox();  self.cb_waveform.addItems(["5HT","Else"])
         #self.cb_waveform.setCurrentText(defaults["waveform"]);                     form.addRow("Waveform:", self.cb_waveform)
 
-        self.le_time_btw    = QLineEdit(str(defaults["time_between_files"]));     form.addRow("Time Between Files:", self.le_time_btw)
-        self.le_files_before= QLineEdit(str(defaults["files_before_treatment"])); form.addRow("Files Before Treatment:", self.le_files_before)
+        self.le_file_length = QLineEdit(str(defaults["file_length"]))
+        form.addRow("File Length (seconds):", make_labeled_field_with_help(
+            "File Length (seconds)", self.le_file_length,
+            "Total duration (in seconds) of each recorded file."
+        ))
 
-        self.cb_file_type   = QComboBox(); self.cb_file_type.addItems(["None","Spontaneous","Stimulation"])
+        self.le_acq_freq = QLineEdit(str(defaults["acquisition_frequency"]))  
+        form.addRow("Acquisition Frequency (Hz):", make_labeled_field_with_help(
+            "Acquisition Frequency (Hz)", self.le_acq_freq,
+            "Sampling rate of the acquisition system, in Hertz (Hz)."
+        ))
+
+        self.le_peak_pos = QLineEdit(str(defaults["peak_position"])) 
+        form.addRow("Peak Position (Voltage):", make_labeled_field_with_help(
+            "Peak Position (Voltage)", self.le_peak_pos,
+            "Expected position of the signal peak on the voltage axis (e.g., 257 for 5HT). "
+            "You may enter an approximate value and adjust it later after identifying the actual peak."
+        ))
+
+        self.le_treatment = QLineEdit(defaults["treatment"])
+        form.addRow("Treatment:", make_labeled_field_with_help(
+            "Treatment", self.le_treatment,
+            "Name of the treatment applied (e.g., Sertraline)."
+        ))
+
+        self.le_time_btw = QLineEdit(str(defaults["time_between_files"]))
+        form.addRow("Time Between Files (minutes):", make_labeled_field_with_help(
+            "Time Between Files (minutes)", self.le_time_btw,
+            "Interval (in minutes) between each stimulation or recording session (e.g., 10)."
+        ))
+
+        self.le_files_before = QLineEdit(str(defaults["files_before_treatment"])) 
+        form.addRow("Files Before Treatment:", make_labeled_field_with_help(
+            "Files Before Treatment", self.le_files_before,
+            "Number of recording files acquired before applying the treatment "
+            "(e.g., 3 untreated files, followed by treated ones)."
+        ))
+
+        self.cb_file_type = QComboBox(); self.cb_file_type.addItems(["None","Spontaneous","Stimulation"])
         self.cb_file_type.setCurrentText(defaults["file_type"]);                   form.addRow("File Type:", self.cb_file_type)
 
         # store loaded stim_params so get_settings() can return it if user doesn’t change it
@@ -246,9 +276,18 @@ class StimParamsDialog(QDialog):
         self.edits = {}
         params = ["start", "duration", "frequency", "amplitude", "pulses"]
         defaults = defaults or {"start": 5.0, "duration": 2.0, "frequency": 20, "amplitude": 0.5, "pulses": 50}
+        help_texts = {
+            "start": "Start time of stimulation in minutes.",
+            "duration": "Duration of stimulation pulse in seconds.",
+            "frequency": "Frequency of stimulation pulses in Hz.",
+            "amplitude": "Amplitude of stimulation current in nA.",
+            "pulses": "Total number of stimulation pulses."
+        }
+
         for p in params:
             edit = QLineEdit(str(defaults[p]))
-            form.addRow(f"{p.capitalize()}:", edit)
+            help_widget = make_labeled_field_with_help(p.capitalize(), edit, help_texts[p])
+            form.addRow(f"{p.capitalize()}:", help_widget)
             self.edits[p] = edit
         buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         buttons.accepted.connect(self.accept)
@@ -512,13 +551,23 @@ class ProcessingOptionsDialog(QDialog):
         saved = self.qsettings.value("processing_pipeline", type=str)
         saved_selection = json.loads(saved) if saved else []
 
+        help_texts = {
+            "Background Subtraction": "Removes background offset based on early values.",
+            "Gaussian Smoothing 2D": "Applies 2D Gaussian blur to reduce noise.",
+            "Rolling Mean": "Applies a moving average to smooth the trace.",
+            "Butterworth Filter": "Applies a low-pass filter while preserving waveform.",
+            "Savitzky-Golay Filter": "Fits local polynomials to smooth data.",
+            "Baseline Correction": "Removes baseline drift from the signal.",
+            "Normalize": "Normalizes each trace based on peak amplitude.",
+        }
+
         for name, default_checked in self.processor_options:
             if name == "Find Amplitude":
                 continue
             cb = QCheckBox(name)
-            # Override default if saved selection exists
             cb.setChecked(name in saved_selection if saved_selection else default_checked)
-            layout.addWidget(cb)
+            help_widget = make_labeled_field_with_help(name, cb, help_texts.get(name, "No help available."))
+            layout.addWidget(help_widget)
             self.checkboxes[name] = cb
         
         # Dialog buttons
@@ -962,3 +1011,22 @@ class PlotCanvas(FigureCanvas):
         self.axes.set_xticks(np.arange(0, max(time_points) + 1, 10))
         self.fig.tight_layout()
         self.draw()
+
+
+def make_labeled_field_with_help(label_text, widget, help_text):
+    container = QWidget()
+    layout = QHBoxLayout(container)
+    layout.setContentsMargins(0, 0, 0, 0)
+    layout.setSpacing(4)  # Less space between field and button
+
+    help_btn = QPushButton("?")
+    help_btn.setFixedSize(20, 20)
+    help_btn.setToolTip(help_text)
+    help_btn.setStyleSheet("QPushButton { border-radius: 10px; padding: 0px; font-weight: bold; }")
+
+    help_btn.clicked.connect(lambda: QMessageBox.information(container, label_text, help_text))
+
+    layout.addWidget(widget)
+    layout.addWidget(help_btn)
+
+    return container
