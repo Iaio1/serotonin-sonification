@@ -752,7 +752,7 @@ class PlotCanvas(FigureCanvas):
         if peak_position is not None:
             title += f" at Peak Position {peak_position}"
         self.axes.set_title(title)
-        self.axes.grid(True)
+        self.axes.grid(False)
         self.axes.legend()
 
         #self.fig.tight_layout()
@@ -789,7 +789,7 @@ class PlotCanvas(FigureCanvas):
         self.axes.set_ylabel('Amplitude')
         self.axes.set_title('Mean Amplitude Over Time (All Experiments)')
         self.axes.legend()
-        self.axes.grid(True)
+        self.axes.grid(False)
         self.fig.tight_layout()
         self.draw()
 
@@ -877,7 +877,7 @@ class PlotCanvas(FigureCanvas):
         self.axes.set_xlabel("Time (minutes)")
         self.axes.set_ylabel("Tau (decay constant)")
         self.axes.set_title("Exponential Decay Tau Over Time Points")
-        self.axes.grid(True)
+        self.axes.grid(False)
         self.axes.legend()
         self.fig.tight_layout()
         self.draw()
