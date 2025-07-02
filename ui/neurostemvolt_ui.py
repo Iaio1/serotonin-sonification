@@ -422,9 +422,19 @@ class ColorPlotPage(QWizardPage):
 
     def run_processing(self):
         group_analysis = self.wizard().group_analysis
-        group_analysis.set_processing_options_exp(self.selected_processors)
+        peak_pos = QSettings("HashemiLab", "NeuroStemVolt").value("peak_position", type=int)
+
+        # Always include FindAmplitude, but ensure it's not duplicated
+        user_processors = self.selected_processors or []
+        mandatory = FindAmplitude(peak_pos)
+
+        processors = [p for p in user_processors if not isinstance(p, FindAmplitude)]
+        processors.append(mandatory)
+
+        group_analysis.set_processing_options_exp(processors)
         for exp in group_analysis.get_experiments():
             exp.run()
+
         self.update_file_display()
 
     def revert_processing(self):
@@ -443,6 +453,19 @@ class ColorPlotPage(QWizardPage):
                 for name in selected_names
                 if ProcessingOptionsDialog.get_processor_instance(name, peak_pos) is not None
             ]
+
+    def validatePage(self):
+        # Automatically add FindAmplitude processor and run it before proceeding
+        group_analysis = self.wizard().group_analysis
+        peak_pos = QSettings("HashemiLab", "NeuroStemVolt").value("peak_position", type=int)
+
+        processor = FindAmplitude(peak_pos)
+
+        for exp in group_analysis.get_experiments():
+            exp.set_processing_steps([processor])  # only FindAmplitude
+            exp.run()
+
+        return True  # allow transition to next page
 
     def save_all_ITs(self):
         group_analysis = self.wizard().group_analysis
@@ -487,6 +510,8 @@ class ProcessingOptionsDialog(QDialog):
         layout = QVBoxLayout()
 
         for name, checked in self.processor_options:
+            if name == "Find Amplitude":
+                continue
             cb = QCheckBox(name)
             cb.setChecked(checked)
             layout.addWidget(cb)

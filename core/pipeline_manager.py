@@ -24,7 +24,7 @@ class PipelineManager:
         """
         Runs the processing pipeline for a single spheroid file.
         """
-        data = spheroid_file.get_data()
+        data = spheroid_file.get_processed_data()
         context = context or {}  # Initialize context if not provided
         for processor in self.list_processors:
             # Check if the processor's process method accepts a 'context' argument
