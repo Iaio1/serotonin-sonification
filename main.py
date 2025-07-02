@@ -66,7 +66,13 @@ def main():
     # Create wizard (but don't show yet)
     wizard = QWizard()
     wizard.setWindowTitle("NeuroStemVolt")
-    icon_path = os.path.join(os.path.dirname(__file__), "ui", "LogoNeuroStemVoltV1.0.0.png")
+    
+    # Fix the empty space issue
+    wizard.setWizardStyle(QWizard.ModernStyle)  # Try different styles if needed
+    #wizard.setFixedSize(700, 600)  # Set a specific size to eliminate extra space
+    # wizard.resize(700, 600)  # Alternative: set initial size but allow resizing
+    
+    icon_path = os.path.join(os.path.dirname(__file__), "ui", "NSV_Logo_Icon.png")
     app.setWindowIcon(QIcon(icon_path))
     wizard.addPage(IntroPage())
     wizard.addPage(ColorPlotPage())
