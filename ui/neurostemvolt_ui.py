@@ -1,6 +1,6 @@
 from PyQt5.QtWidgets import (
     QApplication, QWizard, QComboBox, QLineEdit, QWizardPage, QLabel, QPushButton, QVBoxLayout, QHBoxLayout,
-    QListWidget, QFileDialog, QInputDialog, QGridLayout, QFormLayout, QLineEdit, QDialog, QCheckBox, QDialogButtonBox
+    QListWidget, QFileDialog, QInputDialog, QGridLayout, QFormLayout, QLineEdit, QDialog, QCheckBox, QDialogButtonBox, QMessageBox
 )
 from PyQt5.QtCore import QSettings
 from PyQt5.QtGui import QIcon
@@ -492,19 +492,23 @@ class ResultsPage(QWizardPage):
         analysis.addWidget(btn_amp, 1, 1)
 
         # Result plot & export
-        result_plot = PlotCanvas(self, width=5, height=4)
+        self.result_plot = PlotCanvas(self, width=5, height=4)
         # Connect analysis buttons to their respective methods
-        btn_avg.clicked.connect(lambda: result_plot.show_average_over_experiments(self.wizard().group_analysis))
-        btn_fit.clicked.connect(lambda: result_plot.show_decay_exponential_fitting(self.wizard().group_analysis))
-        btn_param.clicked.connect(lambda: result_plot.show_tau_param_over_time(self.wizard().group_analysis))
-        btn_amp.clicked.connect(lambda: result_plot.show_amplitudes_over_time(self.wizard().group_analysis))
+        btn_avg.clicked.connect(lambda: self.result_plot.show_average_over_experiments(self.wizard().group_analysis))
+        btn_fit.clicked.connect(lambda: self.esult_plot.show_decay_exponential_fitting(self.wizard().group_analysis))
+        btn_param.clicked.connect(lambda: self.result_plot.show_tau_param_over_time(self.wizard().group_analysis))
+        btn_amp.clicked.connect(lambda: self.result_plot.show_amplitudes_over_time(self.wizard().group_analysis))
 
-        #result_plot.plot_line()
-        btn_save = QPushButton("Save Plot"); btn_export = QPushButton("Export All")
+        btn_save = QPushButton("Save Current Plot")
+        btn_save.clicked.connect(self.save_current_plot)
+        btn_save_all = QPushButton("Save All Plots")
+        btn_save_all.clicked.connect(self.save_all_plots)
+        btn_export = QPushButton("Export metrics as csv")
 
         right = QVBoxLayout()
-        right.addWidget(result_plot)
+        right.addWidget(self.result_plot)
         right.addWidget(btn_save)
+        right.addWidget(btn_save_all)
         right.addWidget(btn_export)
         right.addStretch(1)
 
@@ -513,6 +517,41 @@ class ResultsPage(QWizardPage):
         layout.addLayout(left)
         layout.addLayout(right)
         self.setLayout(layout)
+
+    def export_all(self):
+        pass
+
+    def save_current_plot(self):
+        """Save the currently displayed plot as a PNG file."""
+        options = QFileDialog.Options()
+        file_path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Save Current Plot As",
+            "",
+            "PNG Files (*.png);;All Files (*)",
+            options=options
+        )
+        if file_path:
+            self.result_plot.fig.savefig(file_path, dpi=300, bbox_inches='tight')
+            QMessageBox.information(self, "Plot Saved", f"Plot saved to:\n{file_path}")
+
+    def save_all_plots(self):
+        """Save all group-level plots using OutputManager."""
+        output_folder = QSettings("HashemiLab", "NeuroStemVolt").value("output_folder")
+        group_analysis = self.wizard().group_analysis
+        if not output_folder or not os.path.isdir(output_folder):
+            QMessageBox.warning(self, "No Output Folder", "Please set a valid output folder in Experiment Settings.")
+            return
+
+        # Save all group-level plots using OutputManager
+        OutputManager.save_mean_ITs_plot(group_analysis, output_folder)
+        OutputManager.save_plot_tau_over_time(group_analysis, output_folder)
+        OutputManager.save_plot_exponential_fit_aligned(group_analysis, output_folder)
+        OutputManager.save_plot_all_amplitudes_over_time(group_analysis, output_folder)
+        OutputManager.save_plot_mean_amplitudes_over_time(group_analysis, output_folder)
+        # Add more OutputManager plot saves as needed
+
+        QMessageBox.information(self, "Plots Saved", f"All group-level plots saved to:\n{os.path.join(output_folder, 'plots')}")
 
 class PlotCanvas(FigureCanvas):
     def __init__(self, parent=None, width=5, height=4, dpi=100):
