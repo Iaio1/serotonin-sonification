@@ -19,11 +19,14 @@ from core.processing import *
 class IntroPage(QWizardPage):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setTitle("NeuroStemVolt")
+        #self.setTitle("Welcome")
+        #self.setSubTitle("Load replicates to begin.")
         # Initialising the group_analysis object
         self.group_analysis = GroupAnalysis()
         self.display_names_list = []
-        
+
+        self.registerField("replicateCount*", self, "replicateCount")
+
         # This will hold our backend experiment objects
         self.stim_params = None
         # This will hold the current experiment settings
@@ -47,6 +50,9 @@ class IntroPage(QWizardPage):
         v.addWidget(self.btn_exp_settings)
         self.setLayout(v)
 
+    def isComplete(self):
+        return len(self.display_names_list) > 0
+
     def show_experiment_settings_dialog(self):
         dlg = ExperimentSettingsDialog(self)
         if dlg.exec_() == QDialog.Accepted:
@@ -65,6 +71,9 @@ class IntroPage(QWizardPage):
 
         # Also clear our own display_names_list
         self.display_names_list = []
+        
+        # Re-evaluate isComplete
+        self.completeChanged.emit()
 
     def load_replicate(self):
         """Ask the user to pick a folder, build & run the SpheroidExperiment, and display it."""
@@ -99,6 +108,7 @@ class IntroPage(QWizardPage):
         wiz = self.wizard()
         wiz.group_analysis = self.group_analysis
         wiz.display_names_list = self.display_names_list
+
         # if your Next button is gated on isComplete(), let Qt know the page state changed:
         self.completeChanged.emit()
 
@@ -108,6 +118,15 @@ class IntroPage(QWizardPage):
         We can use it to stash our replicates on the wizard for later pages.
         """
         # e.g. store into the wizard object:
+        self.wizard().group_analysis = self.group_analysis
+        self.wizard().display_names_list = self.display_names_list
+        return True
+    
+    def validatePage(self):
+        if len(self.display_names_list) == 0:
+            QMessageBox.warning(self, "No Replicates Loaded", "Please load at least one replicate before continuing.")
+            return False
+
         self.wizard().group_analysis = self.group_analysis
         self.wizard().display_names_list = self.display_names_list
         return True
