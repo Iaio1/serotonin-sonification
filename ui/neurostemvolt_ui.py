@@ -403,10 +403,25 @@ class ColorPlotPage(QWizardPage):
         right.addWidget(self.main_plot)
         right.addLayout(bottom)
 
-        layout = QHBoxLayout()
-        layout.addLayout(left)
-        layout.addLayout(right)
-        self.setLayout(layout)
+        # Main layout for the page
+        main_layout = QVBoxLayout()
+        content_layout = QHBoxLayout()
+        content_layout.addLayout(left)
+        content_layout.addLayout(right)
+        main_layout.addLayout(content_layout)
+
+        # Footer
+        footer = QLabel("© 2025 Hashemi Lab · NeuroStemVolt")
+        footer.setAlignment(Qt.AlignCenter)
+        footer.setStyleSheet("""
+            color: gray;
+            font-family: Helvetica;
+            font-size: 10pt;
+            margin-top: 12px;
+        """)
+        main_layout.addWidget(footer)
+
+        self.setLayout(main_layout)
     
     def initializePage(self):
         # Default index
@@ -690,17 +705,34 @@ class ResultsPage(QWizardPage):
         right.addWidget(self.result_plot)
         right.addStretch(1)
 
-        left = QVBoxLayout(); 
-        layout = QHBoxLayout()
-        #left.addWidget(btn_back); 
-        left.addLayout(analysis); 
+        left = QVBoxLayout()
+        #left.addWidget(btn_back)
+        left.addLayout(analysis)
         left.addWidget(btn_save)
         left.addWidget(btn_save_all)
         left.addWidget(btn_export)
         left.addStretch(1)
-        layout.addLayout(left)
-        layout.addLayout(right)
-        self.setLayout(layout)
+
+        content_layout = QHBoxLayout()
+        content_layout.addLayout(left)
+        content_layout.addLayout(right)
+
+        # Footer
+        footer = QLabel("© 2025 Hashemi Lab · NeuroStemVolt")
+        footer.setAlignment(Qt.AlignCenter)
+        footer.setStyleSheet("""
+            color: gray;
+            font-family: Helvetica;
+            font-size: 10pt;
+            margin-top: 12px;
+        """)
+
+        # Main vertical layout to ensure footer is always at the bottom
+        main_layout = QVBoxLayout()
+        main_layout.addLayout(content_layout)
+        main_layout.addStretch(1)
+        main_layout.addWidget(footer)
+        self.setLayout(main_layout)
 
     def export_all_as_csv(self):
         """Export all relevant metrics as CSV files using OutputManager."""
