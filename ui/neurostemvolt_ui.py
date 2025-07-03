@@ -327,7 +327,7 @@ class ColorPlotPage(QWizardPage):
         self.selected_processors = []
     
         # Left controls
-        self.btn_revert = QPushButton("Revert Changes")
+        self.btn_revert = QPushButton("Reverse Changes")
         apply_custom_styles(self.btn_revert)
         self.btn_revert.clicked.connect(self.revert_processing)
         self.btn_eval = QPushButton("Evaluate")
@@ -669,7 +669,7 @@ class ResultsPage(QWizardPage):
         apply_custom_styles(btn_avg)
         btn_fit = QPushButton("Decay Exponential Fitting")
         apply_custom_styles(btn_fit)
-        btn_param = QPushButton("Exponential Parameter over time")
+        btn_param = QPushButton("Tau Over Time")
         apply_custom_styles(btn_param)
         btn_amp = QPushButton("Amplitudes Over Time")
         apply_custom_styles(btn_amp)
@@ -1111,7 +1111,7 @@ def apply_custom_styles(widget):
             # Save/export buttons
             widget.setStyleSheet("""
                 QPushButton {
-                    background-color: #00DE28;
+                    background-color: #4178F2;
                     color: white;
                     font-family: Helvetica;
                     font-weight: bold;
@@ -1134,7 +1134,7 @@ def apply_custom_styles(widget):
             # General buttons
             widget.setStyleSheet("""
                 QPushButton {
-                    background-color: #00DE97;
+                    background-color: #21AE62;
                     color: white;
                     font-family: Helvetica;
                     font-weight: bold;
@@ -1145,8 +1145,8 @@ def apply_custom_styles(widget):
     elif isinstance(widget, QListWidget):
         widget.setStyleSheet("""
             QListWidget {
-                background-color: #18D5FF;
-                color: white;
+                background-color: #CAF2FB;
+                color: black;
                 font-family: Helvetica;
                 font-weight: bold;
                 border-radius: 8px;
