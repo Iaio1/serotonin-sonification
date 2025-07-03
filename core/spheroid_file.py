@@ -525,7 +525,7 @@ class PLOT_SETTINGS:
         # Custom colormap only
         self.custom = self.get_continuous_cmap(
             ['#001524', '#002f5e', '#f4c300', '#a84900',
-                '#64005f', '#00a37a', '#00751c', '#00ff00'],
+                '#64005f', '#21AE62', '#00751c', '#00ff00'],
             [0, 0.2478, 0.3805, 0.6555, 0.701, 0.7603, 0.7779, 1]
         )
 

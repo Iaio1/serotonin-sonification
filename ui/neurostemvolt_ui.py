@@ -55,7 +55,7 @@ class IntroPage(QWizardPage):
             font-family: Helvetica;
             font-weight: bold;
         """)
-        footer = QLabel("© 2025 Hashemi Lab · NeuroStemVolt")
+        footer = QLabel("© 2025 Hashemi Lab · NeuroStemVolt · v1.0.0")
         footer.setAlignment(Qt.AlignCenter)
         footer.setStyleSheet("""
             color: gray;
@@ -411,7 +411,7 @@ class ColorPlotPage(QWizardPage):
         main_layout.addLayout(content_layout)
 
         # Footer
-        footer = QLabel("© 2025 Hashemi Lab · NeuroStemVolt")
+        footer = QLabel("© 2025 Hashemi Lab · NeuroStemVolt · v1.0.0")
         footer.setAlignment(Qt.AlignCenter)
         footer.setStyleSheet("""
             color: gray;
@@ -455,7 +455,7 @@ class ColorPlotPage(QWizardPage):
             metadata = current_file.get_metadata()
             peak_pos = QSettings("HashemiLab", "NeuroStemVolt").value("peak_position")
 
-            self.main_plot.plot_color(processed_data=processed_data)
+            self.main_plot.plot_color(processed_data=processed_data, peak_pos = peak_pos)
             self.it_plot.plot_IT(processed_data=processed_data,metadata=metadata,peak_position=peak_pos)
 
     def clear_all(self):
@@ -489,7 +489,7 @@ class ColorPlotPage(QWizardPage):
             metadata = sph_file.get_metadata()
             peak_pos = QSettings("HashemiLab", "NeuroStemVolt").value("peak_position")
 
-            self.main_plot.plot_color(processed_data=processed_data)
+            self.main_plot.plot_color(processed_data=processed_data, peak_pos=peak_pos)
             self.it_plot.plot_IT(processed_data=processed_data,metadata=metadata,peak_position=peak_pos)
         except IndexError:
             self.txt_file.setText("No file at this index")
@@ -660,79 +660,76 @@ class ProcessingOptionsDialog(QDialog):
 class ResultsPage(QWizardPage):
     def __init__(self, parent=None):
         super().__init__(parent)
-        #self.setTitle("Results")
 
-        btn_back = QPushButton("Back")
+        # — Analysis buttons —
+        btn_avg    = QPushButton("Average Over Experiments");      apply_custom_styles(btn_avg)
+        btn_fit    = QPushButton("Decay Exponential Fitting");     apply_custom_styles(btn_fit)
+        btn_param  = QPushButton("Tau Over Time");                 apply_custom_styles(btn_param)
+        btn_amp    = QPushButton("Amplitudes Over Time");          apply_custom_styles(btn_amp)
 
-        # Analysis buttons
-        btn_avg = QPushButton("Average Over Experiments")
-        apply_custom_styles(btn_avg)
-        btn_fit = QPushButton("Decay Exponential Fitting")
-        apply_custom_styles(btn_fit)
-        btn_param = QPushButton("Tau Over Time")
-        apply_custom_styles(btn_param)
-        btn_amp = QPushButton("Amplitudes Over Time")
-        apply_custom_styles(btn_amp)
-
+        # grid of analysis buttons
         analysis = QGridLayout()
-        analysis.addWidget(btn_avg, 0, 0)
-        analysis.addWidget(btn_fit, 0, 1)
-        analysis.addWidget(btn_param, 1, 0)
-        analysis.addWidget(btn_amp, 1, 1)
+        analysis.addWidget(btn_avg,    0, 0)
+        analysis.addWidget(btn_fit,    0, 1)
+        analysis.addWidget(btn_param,  1, 0)
+        analysis.addWidget(btn_amp,    1, 1)
 
-        # Result plot & export
-        self.result_plot = PlotCanvas(self, width=5, height=4)
-        # Connect analysis buttons to their respective methods
-        btn_avg.clicked.connect(lambda: self.result_plot.show_average_over_experiments(self.wizard().group_analysis))
-        btn_fit.clicked.connect(self.handle_decay_fit)
-        #btn_fit.clicked.connect(lambda: self.result_plot.show_decay_exponential_fitting(self.wizard().group_analysis))
-        btn_param.clicked.connect(lambda: self.result_plot.show_tau_param_over_time(self.wizard().group_analysis))
-        btn_amp.clicked.connect(lambda: self.result_plot.show_amplitudes_over_time(self.wizard().group_analysis))
-
-        btn_save = QPushButton("Save Current Plot")
-        apply_custom_styles(btn_save)
-        btn_save.clicked.connect(self.save_current_plot)
-        btn_save_all = QPushButton("Save All Plots")
-        apply_custom_styles(btn_save_all)
-        btn_save_all.clicked.connect(self.save_all_plots)
-        btn_export = QPushButton("Export metrics as csv")
-        apply_custom_styles(btn_export)
-        btn_export.clicked.connect(self.export_all_as_csv)
+        # — Save/Export buttons —
+        btn_save     = QPushButton("Save Current Plot");          apply_custom_styles(btn_save)
+        btn_save_all = QPushButton("Save All Plots");             apply_custom_styles(btn_save_all)
+        btn_export   = QPushButton("Export metrics as csv");      apply_custom_styles(btn_export)
 
         self.analysis_buttons = [btn_avg, btn_fit, btn_param, btn_amp, btn_save, btn_save_all, btn_export]
 
-        right = QVBoxLayout()
-        right.addWidget(self.result_plot)
-        right.addStretch(1)
+        # — Placeholder & PlotCanvas —
+        self.placeholder = QLabel("Select an analysis option to show plot")
+        self.placeholder.setAlignment(Qt.AlignCenter)
+        self.result_plot = PlotCanvas(self, width=5, height=4)
+        self.result_plot.hide()  # start hidden
 
-        left = QVBoxLayout()
-        #left.addWidget(btn_back)
-        left.addLayout(analysis)
-        left.addWidget(btn_save)
-        left.addWidget(btn_save_all)
-        left.addWidget(btn_export)
-        left.addStretch(1)
+        # connect buttons to show‐and‐plot
+        for btn, fn in (
+            (btn_avg,   lambda: self.result_plot.show_average_over_experiments(self.wizard().group_analysis)),
+            (btn_fit,   self.handle_decay_fit),
+            (btn_param, lambda: self.result_plot.show_tau_param_over_time(self.wizard().group_analysis)),
+            (btn_amp,   lambda: self.result_plot.show_amplitudes_over_time(self.wizard().group_analysis)),
+        ):
+            btn.clicked.connect(lambda _, f=fn: self._reveal_and_call(f))
 
-        content_layout = QHBoxLayout()
-        content_layout.addLayout(left)
-        content_layout.addLayout(right)
+        btn_save.clicked.connect(self.save_current_plot)
+        btn_save_all.clicked.connect(self.save_all_plots)
+        btn_export.clicked.connect(self.export_all_as_csv)
 
-        # Footer
-        footer = QLabel("© 2025 Hashemi Lab · NeuroStemVolt")
+        # — Layout assembly —
+        main_layout = QVBoxLayout(self)
+
+        # 1) Analysis buttons at top
+        main_layout.addLayout(analysis)
+
+        # 2) Save/Export
+        main_layout.addWidget(btn_save)
+        main_layout.addWidget(btn_save_all)
+        main_layout.addWidget(btn_export)
+
+        # 3) placeholder + future plot
+        main_layout.addWidget(self.placeholder, stretch=1)
+        main_layout.addWidget(self.result_plot, stretch=3)
+
+        # 4) footer
+        footer = QLabel("© 2025 Hashemi Lab · NeuroStemVolt · v1.0.0")
         footer.setAlignment(Qt.AlignCenter)
-        footer.setStyleSheet("""
-            color: gray;
-            font-family: Helvetica;
-            font-size: 10pt;
-            margin-top: 12px;
-        """)
-
-        # Main vertical layout to ensure footer is always at the bottom
-        main_layout = QVBoxLayout()
-        main_layout.addLayout(content_layout)
-        main_layout.addStretch(1)
+        footer.setStyleSheet("color: gray; font-size: 10pt;")
         main_layout.addWidget(footer)
+
         self.setLayout(main_layout)
+
+
+    def _reveal_and_call(self, plot_fn):
+        """Hide placeholder and show canvas, then call the plotting fn."""
+        if self.placeholder.isVisible():
+            self.placeholder.hide()
+            self.result_plot.show()
+        plot_fn()
 
     def export_all_as_csv(self):
         """Export all relevant metrics as CSV files using OutputManager."""
@@ -836,6 +833,12 @@ class TimepointSelectionDialog(QDialog):
 
 class PlotCanvas(FigureCanvas):
     def __init__(self, parent=None, width=5, height=4, dpi=100):
+        import matplotlib
+
+        matplotlib.rcParams.update({
+            "font.family": "Helvetica",
+            "font.size": 10,
+        })
         fig = Figure(figsize=(width, height), dpi=dpi)
         self.fig = fig
         self.axes = fig.add_subplot(111) 
@@ -844,7 +847,7 @@ class PlotCanvas(FigureCanvas):
         fig.tight_layout()
         self.cbar = None
 
-    def plot_color(self, processed_data, title_suffix=None):
+    def plot_color(self, processed_data, peak_pos = None, title_suffix=None):
         from core.spheroid_file import PLOT_SETTINGS  # Ensure it's correctly imported
 
         plot_settings = PLOT_SETTINGS()
@@ -865,14 +868,20 @@ class PlotCanvas(FigureCanvas):
             vmin=vmin,
             vmax=vmax
         )
-
+        if peak_pos != None:
+            self.axes.axhline(
+                y=peak_pos, 
+                color='white', 
+                linewidth=1, 
+                linestyle='--'
+            )
         # Add colorbar using the figure object (Qt-safe)
         self.cbar = self.fig.colorbar(im, ax=self.axes, label="Current (nA)")
 
         self.axes.set_xlabel("Time Points")
         self.axes.set_ylabel("Voltage Steps")
-        title = f"Color Plot{': ' + title_suffix if title_suffix else ''}\nRange: [{vmin:.2f}, {vmax:.2f}] nA"
-        self.axes.set_title(title)
+        title = f"Color Plot{': ' + title_suffix if title_suffix else ''}"
+        self.axes.set_title(title, fontweight='bold')       
 
         self.fig.tight_layout()
         self.draw()
@@ -894,7 +903,7 @@ class PlotCanvas(FigureCanvas):
         profile = processed_data[:, peak_position]
 
         # Plot the main profile
-        self.axes.plot(profile, label="I-T Profile", color='blue', linewidth=1.5)
+        self.axes.plot(profile, label="I-T Profile", color='#4178F2', linewidth=1.5)
 
         # Plot peak markers if metadata is provided
         if metadata and 'peak_amplitude_positions' in metadata:
@@ -904,18 +913,18 @@ class PlotCanvas(FigureCanvas):
             if isinstance(peak_indices, (list, np.ndarray)) and isinstance(peak_values, (list, np.ndarray)):
                 for idx, val in zip(peak_indices, peak_values):
                     if 0 <= idx < len(profile):
-                        self.axes.scatter(idx, val, color='red', zorder=5)
+                        self.axes.scatter(idx, val, color='#FF3877', zorder=5)
                         self.axes.annotate(f"{val:.2f}", (idx, val), textcoords="offset points",
-                                           xytext=(0, 10), ha='center', fontsize=9, color='red')
+                                           xytext=(0, 10), ha='center', fontsize=9, color='#FF3877')
             else:
                 # Assume single value
                 try:
                     idx = int(peak_indices)
                     val = float(peak_values)
                     if 0 <= idx < len(profile):
-                        self.axes.scatter(idx, val, color='red', zorder=5)
+                        self.axes.scatter(idx, val, color='#FF3877', zorder=5)
                         self.axes.annotate(f"{val:.2f}", (idx, val), textcoords="offset points",
-                                           xytext=(0, 10), ha='center', fontsize=9, color='red')
+                                           xytext=(0, 10), ha='center', fontsize=9, color='#FF3877')
                 except Exception:
                     pass
 
@@ -925,7 +934,7 @@ class PlotCanvas(FigureCanvas):
         title = "I-T Profile"
         if peak_position is not None:
             title += f" at Peak Position {peak_position}"
-        self.axes.set_title(title)
+        self.axes.set_title(title, fontweight="bold")
         self.axes.grid(False)
         self.axes.legend()
 
@@ -1107,8 +1116,9 @@ def make_labeled_field_with_help(label_text, widget, help_text):
 def apply_custom_styles(widget):
     if isinstance(widget, QPushButton):
         label = widget.text().lower()
+
         if "save" in label or "export" in label:
-            # Save/export buttons
+            # Save/export buttons (blue)
             widget.setStyleSheet("""
                 QPushButton {
                     background-color: #4178F2;
@@ -1118,8 +1128,19 @@ def apply_custom_styles(widget):
                     border-radius: 10px;
                     padding: 6px 12px;
                 }
+                QPushButton:hover {
+                    background-color: #3366CC;
+                }
+                QPushButton:pressed {
+                    background-color: #264A9E;
+                }
+                QPushButton:disabled {
+                    background-color: #AFCBF9;
+                    color: white;
+                }
             """)
         elif "clear" in label:
+            # Clear buttons (pink/red)
             widget.setStyleSheet("""
                 QPushButton {
                     background-color: #FF3877;
@@ -1129,9 +1150,19 @@ def apply_custom_styles(widget):
                     border-radius: 10px;
                     padding: 6px 12px;
                 }
+                QPushButton:hover {
+                    background-color: #E5306A;
+                }
+                QPushButton:pressed {
+                    background-color: #C12459;
+                }
+                QPushButton:disabled {
+                    background-color: #F5A9C4;
+                    color: white;
+                }
             """)
         else:
-            # General buttons
+            # General buttons (green)
             widget.setStyleSheet("""
                 QPushButton {
                     background-color: #21AE62;
@@ -1141,7 +1172,18 @@ def apply_custom_styles(widget):
                     border-radius: 10px;
                     padding: 6px 12px;
                 }
+                QPushButton:hover {
+                    background-color: #1E9955;
+                }
+                QPushButton:pressed {
+                    background-color: #187D45;
+                }
+                QPushButton:disabled {
+                    background-color: #A0D5BA;
+                    color: white;
+                }
             """)
+    
     elif isinstance(widget, QListWidget):
         widget.setStyleSheet("""
             QListWidget {

@@ -92,7 +92,7 @@ def main():
             color: white;
         }
     """)
-    
+
     wizard.button(QWizard.BackButton).setStyleSheet("""
         QPushButton {
             background-color: #CCCCCC;
