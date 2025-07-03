@@ -65,6 +65,54 @@ def main():
     
     # Create wizard (but don't show yet)
     wizard = QWizard()
+    wizard.setWizardStyle(QWizard.ModernStyle)
+
+    # Customize button texts
+    wizard.setButtonText(QWizard.BackButton, "Back")
+    wizard.setButtonText(QWizard.NextButton, "Next")
+
+    # Apply custom style
+    wizard.button(QWizard.NextButton).setStyleSheet("""
+        QPushButton {
+            background-color: #21AE62;
+            color: white;
+            font-family: Helvetica;
+            font-weight: bold;
+            border-radius: 10px;
+            padding: 6px 12px;
+        }
+        QPushButton:hover {
+            background-color: #1E9955;
+        }
+        QPushButton:pressed {
+            background-color: #187D45;
+        }
+        QPushButton:disabled {
+            background-color: #A0D5BA;
+            color: white;
+        }
+    """)
+    
+    wizard.button(QWizard.BackButton).setStyleSheet("""
+        QPushButton {
+            background-color: #CCCCCC;
+            color: black;
+            font-family: Helvetica;
+            border-radius: 10px;
+            padding: 6px 12px;
+        }
+        QPushButton:hover {
+            background-color: #BBBBBB;
+        }
+        QPushButton:pressed {
+            background-color: #AAAAAA;
+        }
+        QPushButton:disabled {
+            background-color: #EEEEEE;
+            color: #888888;
+        }
+    """)
+    
     wizard.setWindowTitle("NeuroStemVolt")
     
     # Fix the empty space issue
