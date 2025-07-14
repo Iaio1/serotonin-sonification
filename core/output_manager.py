@@ -211,15 +211,16 @@ class OutputManager:
 
     @staticmethod
     def save_all_exponential_fitting_params(group_experiments : GroupAnalysis, output_folder_path):
-        
+        """
+        Save all exponential fitting parameters (A_fit, A_err, tau_fit, tau_err, C_fit, C_err) over time.
+        """
         params_matrix = group_experiments.get_exponential_fit_params_over_time()
-
         experiments = group_experiments.get_experiments()
         n_experiments = len(experiments)
         n_files = experiments[0].get_file_count()
         n_before = experiments[0].get_number_of_files_before_treatment()
         interval = experiments[0].get_time_between_files()  # e.g., 10
- 
+
         if n_experiments == 0:
             return None
         # Initialise the time axis (first column)
@@ -228,7 +229,7 @@ class OutputManager:
         else:
             time_points = [i * interval for i in range(n_files)]
         
-        # Build DataFrame
+        # Build DataFrame with unpacked columns
         df = pd.DataFrame(params_matrix, columns=["A_fit", "A_err", "tau_fit", "tau_err", "C_fit", "C_err"])  
         df.insert(0, "Time", time_points)
 
