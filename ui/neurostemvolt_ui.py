@@ -293,28 +293,49 @@ class StimParamsDialog(QDialog):
         self.setWindowTitle("Stimulation Parameters")
         form = QFormLayout(self)
         self.edits = {}
-        params = ["start", "duration", "frequency", "amplitude", "pulses"]
-        defaults = defaults or {"start": 5.0, "duration": 2.0, "frequency": 20, "amplitude": 0.5, "pulses": 50}
+        self.params = ["start", "frequency", "amplitude", "pulses"]
+        defaults = defaults or {"start": 5.0, "frequency": 20, "amplitude": 0.5, "pulses": 50}
         help_texts = {
             "start": "Start time of stimulation in minutes.",
-            "duration": "Duration of stimulation pulse in seconds.",
+            "pulses": "Total number of stimulation pulses.",
             "frequency": "Frequency of stimulation pulses in Hz.",
             "amplitude": "Amplitude of stimulation current in nA.",
-            "pulses": "Total number of stimulation pulses."
         }
 
-        for p in params:
+        for p in self.params:
             edit = QLineEdit(str(defaults[p]))
             help_widget = make_labeled_field_with_help(p.capitalize(), edit, help_texts[p])
             form.addRow(f"{p.capitalize()}:", help_widget)
             self.edits[p] = edit
+
         buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
         form.addRow(buttons)
 
     def get_params(self):
-        return {k: float(self.edits[k].text()) for k in self.edits}
+        """Return parameters as a dict, including calculated duration."""
+        params = {}
+
+        # Get user inputs
+        for p in self.params:
+            try:
+                params[p] = float(self.edits[p].text())
+            except ValueError:
+                params[p] = 0.0
+
+        # Calculate duration
+        try:
+            pulses = params["pulses"]
+            frequency = params["frequency"]
+            params["duration"] = pulses / frequency if frequency != 0 else 0.0
+            print(pulses)
+            print(frequency)
+            print(params["duration"])
+        except KeyError:
+            params["duration"] = 0.0
+
+        return params
 
 
 ### Second Page
