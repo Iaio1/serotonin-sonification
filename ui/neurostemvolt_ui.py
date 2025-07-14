@@ -409,7 +409,6 @@ class ColorPlotPage(QWizardPage):
 
         left = QVBoxLayout()
         left.addWidget(self.btn_revert)
-        left.addWidget(self.btn_eval)
         left.addWidget(self.cbo_rep)
         left.addWidget(self.txt_file)
 
@@ -417,6 +416,7 @@ class ColorPlotPage(QWizardPage):
     
         left.addLayout(nav)
         left.addWidget(self.btn_filter)
+        left.addWidget(self.btn_eval)
         #left.addWidget(btn_apply)
         left.addWidget(self.btn_save)
         left.addWidget(self.btn_export)
