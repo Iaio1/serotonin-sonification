@@ -54,3 +54,6 @@ class ExponentialFitting(Processor):
     
 def exp_decay(t, A, tau, C):
     return A * np.exp(-t / tau) + C
+
+def exp_decay_k(t, A, k, C):
+    return A * np.exp(-k * t / tau) + C
