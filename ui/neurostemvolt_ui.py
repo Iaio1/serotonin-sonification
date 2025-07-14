@@ -24,6 +24,7 @@ class IntroPage(QWizardPage):
         # Initialising the group_analysis object
         self.group_analysis = GroupAnalysis()
         self.display_names_list = []
+        self.number_of_files = 0
 
         self.registerField("replicateCount*", self, "replicateCount")
 
@@ -96,7 +97,7 @@ class IntroPage(QWizardPage):
 
     def load_replicate(self):
         """Ask the user to pick a folder, build & run the SpheroidExperiment, and display it."""
-        
+
         if self.experiment_settings is None:
             if not self.show_experiment_settings_dialog():
                 self.load_replicate()
@@ -115,6 +116,19 @@ class IntroPage(QWizardPage):
         if not paths:
             # optional: warn “no .txt found”
             return
+        
+        if self.number_of_files != 0 and self.number_of_files != len(paths):
+            QMessageBox.warning(
+                self,
+                "Warning! Missing Files!",
+                "Folders do not contain the same number of files.\n"
+                f"Expected: {self.number_of_files}, Found: {len(paths)}"
+            )
+            return
+        
+        # If first replicate, set number_of_files
+        if self.number_of_files == 0:
+            self.number_of_files = len(paths)
 
         filtered = {k: v for k, v in settings.items() if k != "output_folder"}
         exp = SpheroidExperiment(paths,**filtered)
