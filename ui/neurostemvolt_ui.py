@@ -99,6 +99,7 @@ class IntroPage(QWizardPage):
         
         if self.experiment_settings is None:
             if not self.show_experiment_settings_dialog():
+                self.load_replicate()
                 return   # user cancelled, bail out
 
         settings = self.experiment_settings
@@ -181,16 +182,19 @@ class ExperimentSettingsDialog(QDialog):
         #self.cb_waveform    = QComboBox();  self.cb_waveform.addItems(["5HT","Else"])
         #self.cb_waveform.setCurrentText(defaults["waveform"]);                     form.addRow("Waveform:", self.cb_waveform)
 
-        self.le_file_length = QLineEdit(str(defaults["file_length"]))
-        form.addRow("File Length (seconds):", make_labeled_field_with_help(
-            "File Length (seconds)", self.le_file_length,
-            "Total duration (in seconds) of each recorded file."
-        ))
+        self.cb_file_type = QComboBox(); self.cb_file_type.addItems(["None","Spontaneous","Stimulation"])
+        self.cb_file_type.setCurrentText(defaults["file_type"]);                   form.addRow("File Type:", self.cb_file_type)
 
         self.le_acq_freq = QLineEdit(str(defaults["acquisition_frequency"]))  
         form.addRow("Acquisition Frequency (Hz):", make_labeled_field_with_help(
             "Acquisition Frequency (Hz)", self.le_acq_freq,
             "Sampling rate of the acquisition system, in Hertz (Hz)."
+        ))
+
+        self.le_file_length = QLineEdit(str(defaults["file_length"]))
+        form.addRow("File Length (seconds):", make_labeled_field_with_help(
+            "File Length (seconds)", self.le_file_length,
+            "Total duration (in seconds) of each recorded file."
         ))
 
         self.le_peak_pos = QLineEdit(str(defaults["peak_position"])) 
@@ -218,9 +222,6 @@ class ExperimentSettingsDialog(QDialog):
             "Number of recording files acquired before applying the treatment "
             "(e.g., 3 untreated files, followed by treated ones)."
         ))
-
-        self.cb_file_type = QComboBox(); self.cb_file_type.addItems(["None","Spontaneous","Stimulation"])
-        self.cb_file_type.setCurrentText(defaults["file_type"]);                   form.addRow("File Type:", self.cb_file_type)
 
         # store loaded stim_params so get_settings() can return it if user doesn’t change it
         self.stim_params = defaults["stim_params"]
@@ -256,14 +257,14 @@ class ExperimentSettingsDialog(QDialog):
                 return  # abort if they cancelled stim-params
 
         # now persist *all* fields
-        self.qsettings.setValue("file_length",           int(self.le_file_length.text()))
+        self.qsettings.setValue("file_type",             self.cb_file_type.currentText())
         self.qsettings.setValue("acquisition_frequency", int(self.le_acq_freq.text()))
+        self.qsettings.setValue("file_length",           int(self.le_file_length.text()))
         self.qsettings.setValue("peak_position",         int(self.le_peak_pos.text()))
         self.qsettings.setValue("treatment",             self.le_treatment.text())
         #self.qsettings.setValue("waveform",              self.cb_waveform.currentText())
         self.qsettings.setValue("time_between_files",    int(self.le_time_btw.text()))
         self.qsettings.setValue("files_before_treatment",int(self.le_files_before.text()))
-        self.qsettings.setValue("file_type",             self.cb_file_type.currentText())
         self.qsettings.setValue("output_folder", self.le_output_folder.text())
         # stim_params → JSON string
         print("Saving stim_params:", self.stim_params)
@@ -299,7 +300,7 @@ class StimParamsDialog(QDialog):
             "start": "Start time of stimulation in minutes.",
             "pulses": "Total number of stimulation pulses.",
             "frequency": "Frequency of stimulation pulses in Hz.",
-            "amplitude": "Amplitude of stimulation current in nA.",
+            "amplitude": "Amplitude of stimulation current in uA.",
         }
 
         for p in self.params:
