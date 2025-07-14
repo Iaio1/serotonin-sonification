@@ -1007,11 +1007,12 @@ class PlotCanvas(FigureCanvas):
         dof  = max(0, len(time_all) - 3)
         tval = t.ppf(0.975, dof)
         J        = np.empty((len(t_fit_rel), 3))
-        J[:, 0]  = np.exp(-t_fit_rel * k_fit)
-        J[:, 1]  = -A_fit * t_fit_rel * np.exp(-t_fit_rel * k_fit)
-        J[:, 2]  = 1
+        J = np.empty((len(t_fit_rel), 3))
+        J[:, 0] = np.exp(-t_fit_rel * k_fit)                            
+        J[:, 1] = -(A_fit - C_fit) * t_fit_rel * np.exp(-t_fit_rel * k_fit) 
+        J[:, 2] = 1 - np.exp(-t_fit_rel * k_fit)                        
         pcov = np.diag([A_err**2, k_err**2, C_err**2])
-        ci       = np.sqrt(np.sum((J @ pcov) * J, axis=1)) * tval
+        ci = np.sqrt(np.sum((J @ pcov) * J, axis=1)) * tval
         lower_ci = y_fit - ci
         upper_ci = y_fit + ci
 
