@@ -8,7 +8,7 @@ class GroupAnalysis:
     """
     Usage:
         This class is used to manage and analyze multiple SpheroidExperiment instances.
-        It allows adding experiments, retrieving single experiments, and (currently) plotting amplitudes over time.
+        It allows adding experiments, retrieving single experiments, and plotting amplitudes over time.
     """
     def __init__(self, experiments=None):
         if experiments is None:
@@ -297,23 +297,13 @@ class GroupAnalysis:
         time_all = np.tile(A, n_experiments)  # Repeat time point
         print(np.shape(time_all))
 
-        #print("Len ITs Flattened:", len(ITs_flattened))
-        #print("ITs_Flattened", np.shape(ITs_flattened))
-        #print("Time All", np.shape(time_all))
-
-        # Improved initial guess for parameters
-        # A: amplitude (difference between max and min of cropped ITs)
-        # tau: decay constant (guess as 1/3 of the time range)
-        # C: baseline (last value of the mean trace)
         mean_trace = np.mean(cropped_ITs, axis=0)
-        #C0 = float(mean_trace[-1])
         C0 = np.median(mean_trace[-10:])
-        #A0 = float(mean_trace[0])
         A0 = np.mean(mean_trace[0:10])
         k0 = 0.01
         p0 = [k0]
 
-            # Step 3: Fit k only, fix A0 and C0
+        #Fit k only, fix A0 and C0
         def exp_decay_k_only(t, k):
             return (A0 - C0) * np.exp(-k * t) + C0
 
@@ -324,7 +314,7 @@ class GroupAnalysis:
         tau_fit = 1 / k_fit
         t_half = np.log(2) * tau_fit
 
-        # Step 4: Fit A only, fix k and C0
+        # Fit A only, fix k and C0
         def exp_decay_fixed_kC(t, A):
             return (A - C0) * np.exp(-k_fit * t) + C0
 
@@ -332,7 +322,7 @@ class GroupAnalysis:
         A_fit = popt_a[0]
         A_err = np.sqrt(np.diag(pcov_a))[0]
 
-        # Step 5: Fit C only, fix k and A
+        # Fit C only, fix k and A
         def exp_decay_fixed_kA(t, C):
             return (A_fit - C) * np.exp(-k_fit * t) + C
 
@@ -341,15 +331,14 @@ class GroupAnalysis:
         C_err = np.sqrt(np.diag(pcov_c))[0]
 
         # Final report
-        print("Fit results (sequential):")
-        print(f"k = {k_fit:.4f} ± {k_err:.4f}")
-        print(f"A = {A_fit:.4f} ± {A_err:.4f}")
-        print(f"C = {C_fit:.4f} ± {C_err:.4f}")
-        print(f"Tau = {tau_fit:.4f}")
-        print(f"t_half = {t_half:.4f}")
+        #print("Fit results (sequential):")
+        #print(f"k = {k_fit:.4f} ± {k_err:.4f}")
+        #print(f"A = {A_fit:.4f} ± {A_err:.4f}")
+        #print(f"C = {C_fit:.4f} ± {C_err:.4f}")
+        #print(f"Tau = {tau_fit:.4f}")
+        #print(f"t_half = {t_half:.4f}")
 
         # Pre-allocated_ITs_array is the matrix with all data properly aligned on their peaks
-        #return time_all, cropped_ITs, pre_allocated_ITs_array, t_half, popt, pcov,  A_fit, tau_fit, C_fit
         return time_all, cropped_ITs, pre_allocated_ITs_array, t_half, (A_fit, k_fit, C_fit), (A_err, k_err, C_err), min_peak
     
     def get_tau_over_time(self):

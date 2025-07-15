@@ -1,0 +1,14 @@
+name: neurostemvolt
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.11
+  - numpy
+  - pandas
+  - matplotlib
+  - pyqt
+  - scipy
+  - pip
+  - pip:
+      - pyinstaller

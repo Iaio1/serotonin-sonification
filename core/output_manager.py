@@ -192,7 +192,7 @@ class OutputManager:
             return None
         
         curves = group_experiments.get_all_reuptake_curves()
-        curves_aligned = curves.T #Our structure of the matrix is like save_all_ITs
+        curves_aligned = curves.T # Our structure of the matrix is like save_all_ITs
 
         # Create time axis in seconds
         acq_freq = group_experiments.get_single_experiments(0).get_acquisition_frequency()
