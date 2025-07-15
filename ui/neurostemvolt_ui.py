@@ -1106,12 +1106,23 @@ class PlotCanvas(FigureCanvas):
         """
         import numpy as np
 
+        # Show loading dialog
+        progress = QProgressDialog("Processing data, please wait...", None, 0, 0, self)
+        progress.setWindowModality(Qt.ApplicationModal)
+        progress.setAutoClose(True)
+        progress.setAutoReset(True)
+        progress.setMinimumDuration(0)
+        progress.show()
+        QApplication.processEvents()  # Ensure dialog appears
+
         # Get data from group_analysis
         time_points, mean_amplitudes, all_amplitudes, files_before_treatment = group_analysis.amplitudes_over_time_all_experiments()
+        
         if time_points is None:
             self.axes.clear()
             self.axes.set_title("No data to plot")
             self.draw()
+            progress.close()
             return
 
         all_amplitudes = np.array(all_amplitudes, dtype=float)
@@ -1132,9 +1143,19 @@ class PlotCanvas(FigureCanvas):
         self.axes.grid(False)
         self.fig.tight_layout()
         self.draw()
+        progress.close()
 
     def show_decay_exponential_fitting(self, group_analysis, replicate_time_point=0):
         from PyQt5.QtWidgets import QMessageBox
+        # Show loading dialog
+        progress = QProgressDialog("Processing data, please wait...", None, 0, 0, self)
+        progress.setWindowModality(Qt.ApplicationModal)
+        progress.setAutoClose(True)
+        progress.setAutoReset(True)
+        progress.setMinimumDuration(0)
+        progress.show()
+        QApplication.processEvents()  # Ensure dialog appears
+
         try:
             result = group_analysis.exponential_fitting_replicated(replicate_time_point)
         except ValueError as e:
@@ -1146,24 +1167,20 @@ class PlotCanvas(FigureCanvas):
             self.axes.clear()
             self.axes.set_title("Dimension mismatch error")
             self.draw()
+            progress.close()
             return
         if result is None:
             self.axes.clear()
             self.axes.set_title("No data to fit")
             self.draw()
+            progress.close()
             return
         
         from scipy.stats import t
         import numpy as np
 
         # Get fit and aligned ITs from group_analysis
-        result = group_analysis.exponential_fitting_replicated(replicate_time_point)
-        if result is None:
-            self.axes.clear()
-            self.axes.set_title("No data to fit")
-            self.draw()
-            return
-        
+        # result = group_analysis.exponential_fitting_replicated(replicate_time_point)
         time_all, cropped_ITs, _, t_half, fit_vals, fit_errs, min_peak = result
         A_fit, k_fit, C_fit = fit_vals
         A_err, k_err, C_err = fit_errs
@@ -1180,7 +1197,6 @@ class PlotCanvas(FigureCanvas):
         dof  = max(0, len(time_all) - 3)
         tval = t.ppf(0.975, dof)
         J        = np.empty((len(t_fit_rel), 3))
-        J = np.empty((len(t_fit_rel), 3))
         J[:, 0] = np.exp(-t_fit_rel * k_fit)                            
         J[:, 1] = -(A_fit - C_fit) * t_fit_rel * np.exp(-t_fit_rel * k_fit) 
         J[:, 2] = 1 - np.exp(-t_fit_rel * k_fit)                        
@@ -1200,9 +1216,6 @@ class PlotCanvas(FigureCanvas):
         ITs_flattened = cropped_ITs.flatten()
         self.axes.scatter(time_all-min_peak, ITs_flattened, color='black', s=16, alpha=0.7, label='Data points')
 
-        # c) mean ± 1 SD ribbon
-        #self.axes.fill_between(t_rel, mean_IT - std_IT, mean_IT + std_IT, color='C0', alpha=0.2, label='Mean ± 1 SD')
-
         # d) fitted exponential curve
         self.axes.plot(t_fit_rel, y_fit, color='C1', lw=2, label='Exp fit')
 
@@ -1220,12 +1233,22 @@ class PlotCanvas(FigureCanvas):
         self.axes.grid(False)
         self.fig.tight_layout()
         self.draw()
+        progress.close()
 
     def show_tau_param_over_time(self, group_analysis):
         """
         Plots the exponential decay parameter tau over replicate time points on the embedded canvas.
         """
         import numpy as np
+
+        # Show loading dialog
+        progress = QProgressDialog("Processing data, please wait...", None, 0, 0, self)
+        progress.setWindowModality(Qt.ApplicationModal)
+        progress.setAutoClose(True)
+        progress.setAutoReset(True)
+        progress.setMinimumDuration(0)
+        progress.show()
+        QApplication.processEvents()  # Ensure dialog appears
 
         tau_list, tau_err_list = group_analysis.get_tau_over_time()
         n_files = group_analysis.get_experiments()[0].get_file_count()
@@ -1244,6 +1267,7 @@ class PlotCanvas(FigureCanvas):
         self.axes.legend()
         self.fig.tight_layout()
         self.draw()
+        progress.close()
 
     def show_amplitudes_over_time(self, group_analysis):
         """
@@ -1251,11 +1275,21 @@ class PlotCanvas(FigureCanvas):
         """
         import numpy as np
 
+        # Show loading dialog
+        progress = QProgressDialog("Processing data, please wait...", None, 0, 0, self)
+        progress.setWindowModality(Qt.ApplicationModal)
+        progress.setAutoClose(True)
+        progress.setAutoReset(True)
+        progress.setMinimumDuration(0)
+        progress.show()
+        QApplication.processEvents()  # Ensure dialog appears
+
         time_points, mean_amplitudes, all_amplitudes, files_before_treatment = group_analysis.amplitudes_over_time_all_experiments()
         if time_points is None:
             self.axes.clear()
             self.axes.set_title("No data to plot")
             self.draw()
+            progress.close()
             return
 
         all_amplitudes = np.array(all_amplitudes, dtype=float)
@@ -1273,6 +1307,7 @@ class PlotCanvas(FigureCanvas):
         self.axes.set_xticks(np.arange(0, max(time_points) + 1, 10))
         self.fig.tight_layout()
         self.draw()
+        progress.close()
 
 
 def make_labeled_field_with_help(label_text, widget, help_text):
