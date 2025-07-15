@@ -145,6 +145,7 @@ class SpheroidExperiment:
             "stim_start": self.stim_params.get("start", 0),
             "stim_duration": self.stim_params.get("duration", 0),
             "stim_frequency": self.stim_params.get("frequency", 0),
+            "acquisition_frequency": self.acquisition_frequency,
         }
         for spheroid_file in self.files:
             pipeline.run(spheroid_file, context=context)

@@ -250,15 +250,12 @@ class GroupAnalysis:
         mean_amplitudes = np.nanmean(all_amplitudes, axis=0)
         return time_points, mean_amplitudes, all_amplitudes, files_before_treatment
     
-    def exponential_fitting_replicated(self, replicate_time_point = 0, global_peak_amplitude_position=None):
+    def exponential_fitting_replicated(self, replicate_time_point=0, global_peak_amplitude_position=None):
         from scipy.optimize import curve_fit
         n_experiments = len(self.experiments)
         if n_experiments == 0:
-            return None, None, None, None
-        # Assume all experiments have the same number of files/timepoints
+            return None
         n_timepoints = self.experiments[0].get_file_time_points()
-        files_before_treatment = self.experiments[0].get_number_of_files_before_treatment() # This will be zero if no files before treatment
-        
         all_ITs = np.empty((n_experiments, n_timepoints))
         peak_amplitude_positions = []
 
@@ -266,6 +263,11 @@ class GroupAnalysis:
         for i, experiment in enumerate(self.experiments):
             file = experiment.get_spheroid_file(actual_index)
             IT_individual = file.get_processed_data_IT()
+            if IT_individual.shape[0] != n_timepoints:
+                raise ValueError(
+                    f"Replicate {i+1} has {IT_individual.shape[0]} time points, expected {n_timepoints}.\n"
+                    "All replicates must have the same number of time points."
+                )
             metadata = file.get_metadata()
             peak_amplitude_positions.append((metadata["peak_amplitude_positions"]))
             all_ITs[i, :] = IT_individual
@@ -376,22 +378,51 @@ class GroupAnalysis:
     def get_exponential_fit_params_over_time(self):
         """
         Runs exponential_fitting_replicated for each replicate time point,
-        collects A, tau, C and their errors, and returns them as a 2D numpy array.
-        Columns: A_fit, A_error, tau_fit, tau_error, C_fit, C_error
+        collects A, tau, C, t_half and their errors, and returns them as a 2D numpy array.
+        Columns: A_fit, A_error, tau_fit, tau_error, C_fit, C_error, t_half, t_half_error
         Rows: replicate time points
+        The errors here are the standard error of the different quantities, in other words, 
+        what is computed is the one-sigma (≈ 68 % coverage) standard error.
+
+        This assumes that the fitted parameter has an approximately Gaussian sampling distribution
         """
         n_files = self.experiments[0].get_file_count()
+        n_reps = len(self.experiments)
+        z95 = 1.96
+
         results = []
         for t in range(n_files):
             try:
                 _, _, _, t_half, fit_vals, fit_errs, _ = self.exponential_fitting_replicated(replicate_time_point=t)
                 A_fit, k_fit, C_fit = fit_vals
-                A_err, k_err, C_err = fit_errs
-                tau_fit = 1 / k_fit if k_fit != 0 else np.nan
-                tau_err = abs(k_err / (k_fit ** 2)) if k_fit != 0 else np.nan
-                results.append([A_fit, A_err, tau_fit, tau_err, C_fit, C_err])
+                A_SE,  k_SE,   C_SE = fit_errs
+
+                tau_fit   = 1.0 / k_fit
+                tau_SE    = abs(k_SE   / k_fit**2)
+                t_half    = np.log(2) * tau_fit
+                t_half_SE = np.log(2) * tau_SE
+
+                # convert SE to sample SD
+                A_SD      = A_SE      * np.sqrt(n_reps)
+                tau_SD    = tau_SE    * np.sqrt(n_reps)
+                C_SD      = C_SE      * np.sqrt(n_reps)
+                t_half_SD = t_half_SE * np.sqrt(n_reps)
+
+                # 95% CI half‐widths
+                A_CI95      = z95 * A_SE
+                tau_CI95    = z95 * tau_SE
+                C_CI95      = z95 * C_SE
+                t_half_CI95 = z95 * t_half_SE
+
+                results.append([
+                    A_fit,   A_SE,   A_SD,   A_CI95,
+                    tau_fit, tau_SE, tau_SD, tau_CI95,
+                    C_fit,   C_SE,   C_SD,   C_CI95,
+                    t_half,  t_half_SE, t_half_SD, t_half_CI95
+                ])
+
             except Exception as e:
-                results.append([np.nan]*6)
+                results.append([np.nan]*16)
         return np.array(results)
     
     def exponential_fitting_replicated_legacy(self, replicate_time_point = 0, global_peak_amplitude_position=None):

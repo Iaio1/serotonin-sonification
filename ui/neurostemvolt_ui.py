@@ -1,6 +1,6 @@
 from PyQt5.QtWidgets import (
     QWidget, QApplication, QWizard, QComboBox, QLineEdit, QWizardPage, QLabel, QPushButton, QVBoxLayout, QHBoxLayout,
-    QListWidget, QFileDialog, QInputDialog, QGridLayout, QFormLayout, QLineEdit, QDialog, QCheckBox, QDialogButtonBox, QMessageBox, QShortcut
+    QListWidget, QFileDialog, QInputDialog, QGridLayout, QFormLayout, QLineEdit, QDialog, QCheckBox, QDialogButtonBox, QMessageBox, QShortcut, QProgressDialog
 )
 from PyQt5.QtCore import QSettings, Qt
 from PyQt5.QtGui import QIcon, QKeySequence
@@ -567,6 +567,15 @@ class ColorPlotPage(QWizardPage):
         group_analysis = self.wizard().group_analysis
         peak_pos = QSettings("HashemiLab", "NeuroStemVolt").value("peak_position", type=int)
 
+        # Show loading dialog
+        progress = QProgressDialog("Processing data, please wait...", None, 0, 0, self)
+        progress.setWindowModality(Qt.ApplicationModal)
+        progress.setAutoClose(True)
+        progress.setAutoReset(True)
+        progress.setMinimumDuration(0)
+        progress.show()
+        QApplication.processEvents()  # Ensure dialog appears
+
         # Always include FindAmplitude, but ensure it's not duplicated
         user_processors = self.selected_processors or []
         mandatory = FindAmplitude(peak_pos)
@@ -579,6 +588,9 @@ class ColorPlotPage(QWizardPage):
             exp.run()
 
         self.update_file_display()
+        progress.close()
+        self.update_file_display()
+
 
     def revert_processing(self):
         group_analysis = self.wizard().group_analysis
@@ -592,9 +604,9 @@ class ColorPlotPage(QWizardPage):
             selected_names = dlg.get_selected_processors()
             peak_pos = QSettings("HashemiLab", "NeuroStemVolt").value("peak_position", type=int)
             self.selected_processors = [
-                ProcessingOptionsDialog.get_processor_instance(name, peak_pos)
+                dlg.get_processor_instance(name, peak_pos)
                 for name in selected_names
-                if ProcessingOptionsDialog.get_processor_instance(name, peak_pos) is not None
+                if dlg.get_processor_instance(name, peak_pos) is not None
             ]
 
     def validatePage(self):
@@ -631,49 +643,119 @@ class ColorPlotPage(QWizardPage):
 class ProcessingOptionsDialog(QDialog):
     def __init__(self, parent=None, defaults=None):
         super().__init__(parent)
-
         self.setWindowTitle("Filtering Options")
-
         self.qsettings = QSettings("HashemiLab", "NeuroStemVolt")
 
-        # List of available processors and their default checked state
         self.processor_options = [
             ("Background Subtraction", True),
-            ("Gaussian Smoothing 2D", False),
             ("Rolling Mean", False),
+            #("Gaussian Smoothing 2D", False)
             ("Butterworth Filter", True),
             ("Savitzky-Golay Filter", False),
             ("Baseline Correction", True),
             ("Normalize", True),
             ("Find Amplitude", True),
-            #("Exponential Fitting", True),
         ]
 
         self.checkboxes = {}
+        self.param_widgets = {}
         layout = QVBoxLayout()
 
         saved = self.qsettings.value("processing_pipeline", type=str)
         saved_selection = json.loads(saved) if saved else []
 
         help_texts = {
-            "Background Subtraction": "Removes background offset based on early values.",
-            "Gaussian Smoothing 2D": "Applies 2D Gaussian blur to reduce noise.",
-            "Rolling Mean": "Applies a moving average to smooth the trace.",
+            "Background Subtraction": "Subtracts baseline offset by averaging the signal between a specified 'start' and 'end' segment (given as data indices or time points at the beginning of the trace) and subtracting that mean from the entire recording.",
+            "Rolling Mean": "Smooths the trace by computing a moving average over a sliding window of N points. The 'window size' parameter sets how many consecutive samples are included in each average. Larger windows yield smoother traces but can blur sharp features.",
+            #"Gaussian Smoothing 2D": "Applies 2D Gaussian blur to reduce noise.",
             "Butterworth Filter": "Applies a low-pass filter while preserving waveform.",
-            "Savitzky-Golay Filter": "Fits local polynomials to smooth data.",
+            "Savitzky-Golay Filter": "Fits a local polynomial of a given 'order' over each segment of the data to smooth noise. The 'window size' sets how many points are used per fit, while 'order' (the 'p' polynomial order) controls how closely the fit can follow rapid changes.",
             "Baseline Correction": "Removes baseline drift from the signal.",
-            "Normalize": "Normalizes each trace based on peak amplitude.",
+            "Normalize": "Normalizes each trace based on the peak amplitude of the first file within each replicate.",
         }
 
         for name, default_checked in self.processor_options:
             if name == "Find Amplitude":
                 continue
+
+            # Create a vertical layout for each filter option
+            filter_layout = QVBoxLayout()
+            filter_layout.setSpacing(2)
+            filter_layout.setContentsMargins(0, 0, 0, 0)
+
             cb = QCheckBox(name)
             cb.setChecked(name in saved_selection if saved_selection else default_checked)
+            cb.setStyleSheet("font-weight: bold; font-size: 12px;")
             help_widget = make_labeled_field_with_help(name, cb, help_texts.get(name, "No help available."))
-            layout.addWidget(help_widget)
+            filter_layout.addWidget(help_widget)
             self.checkboxes[name] = cb
-        
+
+            # Parameter widget (hidden by default)
+            param_widget = None
+
+            if name == "Background Subtraction":
+                region_layout = QHBoxLayout()
+                region_label = QLabel("Region (start, end) in seconds:")
+                region_label.setStyleSheet("font-size: 11px; color: #555; margin-left: 16px;")
+                region_start = QLineEdit("0")
+                region_end = QLineEdit("10")
+                region_layout.addWidget(region_label)
+                region_layout.addWidget(region_start)
+                region_layout.addWidget(region_end)
+                region_container = QWidget()
+                region_container.setLayout(region_layout)
+                region_container.setContentsMargins(24, 0, 0, 0)  # Indent
+                region_container.hide()
+                param_widget = region_container
+                self.param_widgets[name] = (region_start, region_end)
+            elif name == "Savitzky-Golay Filter":
+                sg_layout = QHBoxLayout()
+                sg_label_w = QLabel("Window:")
+                sg_label_w.setStyleSheet("font-size: 11px; color: #555; margin-left: 16px;")
+                sg_window = QLineEdit("20")
+                sg_label_o = QLabel("Order:")
+                sg_label_o.setStyleSheet("font-size: 11px; color: #555;")
+                sg_order = QLineEdit("2")
+                sg_layout.addWidget(sg_label_w)
+                sg_layout.addWidget(sg_window)
+                sg_layout.addWidget(sg_label_o)
+                sg_layout.addWidget(sg_order)
+                sg_container = QWidget()
+                sg_container.setLayout(sg_layout)
+                sg_container.setContentsMargins(24, 0, 0, 0)  # Indent
+                sg_container.hide()
+                param_widget = sg_container
+                self.param_widgets[name] = (sg_window, sg_order)
+            elif name == "Rolling Mean":
+                rm_layout = QHBoxLayout()
+                rm_label = QLabel("Window Size:")
+                rm_label.setStyleSheet("font-size: 11px; color: #555; margin-left: 16px;")
+                rm_window = QLineEdit("5")
+                rm_layout.addWidget(rm_label)
+                rm_layout.addWidget(rm_window)
+                rm_container = QWidget()
+                rm_container.setLayout(rm_layout)
+                rm_container.setContentsMargins(24, 0, 0, 0)  # Indent
+                rm_container.hide()
+                param_widget = rm_container
+                self.param_widgets[name] = rm_window
+
+            # Add parameter widget to filter layout if it exists
+            if param_widget:
+                filter_layout.addWidget(param_widget)
+
+                # Show/hide parameter widget based on checkbox
+                def toggle_widget(checked, widget=param_widget):
+                    widget.setVisible(checked)
+                cb.stateChanged.connect(toggle_widget)
+                # Set initial visibility
+                param_widget.setVisible(cb.isChecked())
+
+            # Add the filter layout to the main dialog layout
+            filter_container = QWidget()
+            filter_container.setLayout(filter_layout)
+            layout.addWidget(filter_container)
+
         # Dialog buttons
         buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         buttons.accepted.connect(self.accept)
@@ -682,17 +764,34 @@ class ProcessingOptionsDialog(QDialog):
 
         self.setLayout(layout)
 
-    def get_processor_instance(name, peak_position=None):
+    def get_processor_instance(self, name, peak_position=None):
         if name == "Background Subtraction":
-            return BackgroundSubtraction(region=(0, 10))
+            region_start, region_end = self.param_widgets[name]
+            try:
+                start = int(region_start.text())
+                end = int(region_end.text())
+            except ValueError:
+                start, end = 0, 10
+            return BackgroundSubtraction(region=(start, end))
+        elif name == "Savitzky-Golay Filter":
+            sg_window, sg_order = self.param_widgets[name]
+            try:
+                w = int(sg_window.text())
+                p = int(sg_order.text())
+            except ValueError:
+                w, p = 20, 2
+            return SavitzkyGolayFilter(w=w, p=p)
+        elif name == "Rolling Mean":
+            rm_window = self.param_widgets[name]
+            try:
+                window_size = int(rm_window.text())
+            except ValueError:
+                window_size = 5
+            return RollingMean(window_size=window_size)
         elif name == "Gaussian Smoothing 2D":
             return GaussianSmoothing2D()
-        elif name == "Rolling Mean":
-            return RollingMean()
         elif name == "Butterworth Filter":
             return ButterworthFilter()
-        elif name == "Savitzky-Golay Filter":
-            return SavitzkyGolayFilter(w=20, p=2)
         elif name == "Baseline Correction":
             return BaselineCorrection()
         elif name == "Normalize":
@@ -1007,12 +1106,23 @@ class PlotCanvas(FigureCanvas):
         """
         import numpy as np
 
+        # Show loading dialog
+        progress = QProgressDialog("Processing data, please wait...", None, 0, 0, self)
+        progress.setWindowModality(Qt.ApplicationModal)
+        progress.setAutoClose(True)
+        progress.setAutoReset(True)
+        progress.setMinimumDuration(0)
+        progress.show()
+        QApplication.processEvents()  # Ensure dialog appears
+
         # Get data from group_analysis
         time_points, mean_amplitudes, all_amplitudes, files_before_treatment = group_analysis.amplitudes_over_time_all_experiments()
+        
         if time_points is None:
             self.axes.clear()
             self.axes.set_title("No data to plot")
             self.draw()
+            progress.close()
             return
 
         all_amplitudes = np.array(all_amplitudes, dtype=float)
@@ -1033,22 +1143,44 @@ class PlotCanvas(FigureCanvas):
         self.axes.grid(False)
         self.fig.tight_layout()
         self.draw()
+        progress.close()
 
     def show_decay_exponential_fitting(self, group_analysis, replicate_time_point=0):
-        """
-        Plots post-peak IT decays, individual data points, exponential fit, 95% CI, and half-life on the embedded canvas.
-        """
-        from scipy.stats import t
-        import numpy as np
+        from PyQt5.QtWidgets import QMessageBox
+        # Show loading dialog
+        progress = QProgressDialog("Processing data, please wait...", None, 0, 0, self)
+        progress.setWindowModality(Qt.ApplicationModal)
+        progress.setAutoClose(True)
+        progress.setAutoReset(True)
+        progress.setMinimumDuration(0)
+        progress.show()
+        QApplication.processEvents()  # Ensure dialog appears
 
-        # Get fit and aligned ITs from group_analysis
-        result = group_analysis.exponential_fitting_replicated(replicate_time_point)
+        try:
+            result = group_analysis.exponential_fitting_replicated(replicate_time_point)
+        except ValueError as e:
+            QMessageBox.warning(
+                self,
+                "Dimension Mismatch",
+                f"Error: {str(e)}\n\nPlease ensure all replicates have the same number of time points."
+            )
+            self.axes.clear()
+            self.axes.set_title("Dimension mismatch error")
+            self.draw()
+            progress.close()
+            return
         if result is None:
             self.axes.clear()
             self.axes.set_title("No data to fit")
             self.draw()
+            progress.close()
             return
         
+        from scipy.stats import t
+        import numpy as np
+
+        # Get fit and aligned ITs from group_analysis
+        # result = group_analysis.exponential_fitting_replicated(replicate_time_point)
         time_all, cropped_ITs, _, t_half, fit_vals, fit_errs, min_peak = result
         A_fit, k_fit, C_fit = fit_vals
         A_err, k_err, C_err = fit_errs
@@ -1065,7 +1197,6 @@ class PlotCanvas(FigureCanvas):
         dof  = max(0, len(time_all) - 3)
         tval = t.ppf(0.975, dof)
         J        = np.empty((len(t_fit_rel), 3))
-        J = np.empty((len(t_fit_rel), 3))
         J[:, 0] = np.exp(-t_fit_rel * k_fit)                            
         J[:, 1] = -(A_fit - C_fit) * t_fit_rel * np.exp(-t_fit_rel * k_fit) 
         J[:, 2] = 1 - np.exp(-t_fit_rel * k_fit)                        
@@ -1085,9 +1216,6 @@ class PlotCanvas(FigureCanvas):
         ITs_flattened = cropped_ITs.flatten()
         self.axes.scatter(time_all-min_peak, ITs_flattened, color='black', s=16, alpha=0.7, label='Data points')
 
-        # c) mean ± 1 SD ribbon
-        #self.axes.fill_between(t_rel, mean_IT - std_IT, mean_IT + std_IT, color='C0', alpha=0.2, label='Mean ± 1 SD')
-
         # d) fitted exponential curve
         self.axes.plot(t_fit_rel, y_fit, color='C1', lw=2, label='Exp fit')
 
@@ -1105,12 +1233,22 @@ class PlotCanvas(FigureCanvas):
         self.axes.grid(False)
         self.fig.tight_layout()
         self.draw()
+        progress.close()
 
     def show_tau_param_over_time(self, group_analysis):
         """
         Plots the exponential decay parameter tau over replicate time points on the embedded canvas.
         """
         import numpy as np
+
+        # Show loading dialog
+        progress = QProgressDialog("Processing data, please wait...", None, 0, 0, self)
+        progress.setWindowModality(Qt.ApplicationModal)
+        progress.setAutoClose(True)
+        progress.setAutoReset(True)
+        progress.setMinimumDuration(0)
+        progress.show()
+        QApplication.processEvents()  # Ensure dialog appears
 
         tau_list, tau_err_list = group_analysis.get_tau_over_time()
         n_files = group_analysis.get_experiments()[0].get_file_count()
@@ -1129,6 +1267,7 @@ class PlotCanvas(FigureCanvas):
         self.axes.legend()
         self.fig.tight_layout()
         self.draw()
+        progress.close()
 
     def show_amplitudes_over_time(self, group_analysis):
         """
@@ -1136,11 +1275,21 @@ class PlotCanvas(FigureCanvas):
         """
         import numpy as np
 
+        # Show loading dialog
+        progress = QProgressDialog("Processing data, please wait...", None, 0, 0, self)
+        progress.setWindowModality(Qt.ApplicationModal)
+        progress.setAutoClose(True)
+        progress.setAutoReset(True)
+        progress.setMinimumDuration(0)
+        progress.show()
+        QApplication.processEvents()  # Ensure dialog appears
+
         time_points, mean_amplitudes, all_amplitudes, files_before_treatment = group_analysis.amplitudes_over_time_all_experiments()
         if time_points is None:
             self.axes.clear()
             self.axes.set_title("No data to plot")
             self.draw()
+            progress.close()
             return
 
         all_amplitudes = np.array(all_amplitudes, dtype=float)
@@ -1158,6 +1307,7 @@ class PlotCanvas(FigureCanvas):
         self.axes.set_xticks(np.arange(0, max(time_points) + 1, 10))
         self.fig.tight_layout()
         self.draw()
+        progress.close()
 
 
 def make_labeled_field_with_help(label_text, widget, help_text):

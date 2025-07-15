@@ -2,6 +2,7 @@ from core.spheroid_experiment import SpheroidExperiment
 from core.group_analysis import GroupAnalysis
 import os
 import pandas as pd
+import numpy as np
 
 class OutputManager:
     @staticmethod
@@ -62,10 +63,15 @@ class OutputManager:
                         row.append(None)
             data.append(row)
 
+        # Create time axis in seconds
+        acq_freq = group_experiments.get_single_experiments(0).get_acquisition_frequency()
+        time_seconds = np.arange(n_timepoints) / acq_freq
+
         # Create MultiIndex columns
         columns = pd.MultiIndex.from_tuples(arrays, names=["Replicate", "File"])
         df = pd.DataFrame(data, columns=columns)
-        df.index.name = "TimePoint"
+        df.index = time_seconds
+        df.index.name = "Time (s)"
 
         # Save to CSV
         output_IT_folder = os.path.join(output_folder_path, "all_replicates_ITs")
@@ -100,6 +106,7 @@ class OutputManager:
                 os.mkdir(output_IT_folder)
             output_path = os.path.join(output_IT_folder, output_csv)
             df.to_csv(output_path, index_label="TimePoint")
+
     @staticmethod
     def save_peak_amplitudes_metrics(group_experiments : GroupAnalysis, output_folder_path):
         # This function saves the following keys per file in a folder named metadata_files
@@ -187,6 +194,10 @@ class OutputManager:
         curves = group_experiments.get_all_reuptake_curves()
         curves_aligned = curves.T #Our structure of the matrix is like save_all_ITs
 
+        # Create time axis in seconds
+        acq_freq = group_experiments.get_single_experiments(0).get_acquisition_frequency()
+        time_seconds = np.arange(curves_aligned.shape[0]) / acq_freq
+
         # Initialise the matrix
         arrays = []
         data = []
@@ -200,7 +211,8 @@ class OutputManager:
         # Create MultiIndex columns
         columns = pd.MultiIndex.from_tuples(arrays, names=["Replicate", "File"])
         df = pd.DataFrame(curves_aligned, columns=columns)
-        df.index.name = "TimePoint"
+        df.index = time_seconds
+        df.index.name = "Time (s)"
 
         # Save to CSV
         output_IT_folder = os.path.join(output_folder_path, "all_reuptakes")
@@ -230,8 +242,20 @@ class OutputManager:
             time_points = [i * interval for i in range(n_files)]
         
         # Build DataFrame with unpacked columns
-        df = pd.DataFrame(params_matrix, columns=["A_fit", "A_err", "tau_fit", "tau_err", "C_fit", "C_err"])  
+        df = pd.DataFrame(params_matrix, columns=["A_fit",   "A_SE",   "A_SD",   "A_CI95",
+                    "tau_fit", "tau_SE", "tau_SD", "tau_CI95",
+                    "C_fit",   "C_SE",   "C_SD",   "C_CI95",
+                    "t_half",  "t_half_SE", "t_half_SD", "t_half_CI95"])
+        
+        df["Y0"] = df["A_fit"] + df["C_fit"]
+        df["Y0_SE"] = np.sqrt(df["A_SE"]**2 + df["C_SE"]**2)
+        df["Y0_SD"] = np.sqrt(df["A_SD"]**2 + df["C_SD"]**2)
+        df["Y0_CI95"] = np.sqrt(df["A_CI95"]**2 + df["C_CI95"]**2)
         df.insert(0, "Time", time_points)
+         
+        cols = list(df.columns)
+        cols.insert(1, cols.pop(cols.index("Y0")))
+        df = df[cols]
 
         # Save to CSV
         output_folder = os.path.join(output_folder_path, "all_exponential_fit_params")
