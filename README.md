@@ -126,6 +126,6 @@ Minimal environment (see `environment.yml`):
 ## Acknowledgements
 
 Developed by Pablo Prieto Roca and Tomas Andriuskevicius @Hashemi Lab.  
-For questions or support, contact [pp2023@imperial.ac.uk].
+For questions or support, contact [pablo.prieto-roca23@imperial.ac.uk].
 
 
