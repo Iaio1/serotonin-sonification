@@ -376,9 +376,12 @@ class ColorPlotPage(QWizardPage):
         
         #### Handle the signal from cbo_rep
 
-        self.txt_file = QLineEdit(); 
+        #self.txt_file = QLineEdit(); 
         #apply_custom_styles(self.txt_file)
-        self.txt_file.setReadOnly(True)
+        #self.txt_file.setReadOnly(True)
+
+        self.cbo_file = QComboBox()
+        self.cbo_file.currentIndexChanged.connect(self.on_file_changed)
 
         # Default indexes to visualize
         self.current_rep_index = 0
@@ -410,7 +413,7 @@ class ColorPlotPage(QWizardPage):
         left = QVBoxLayout()
         left.addWidget(self.btn_revert)
         left.addWidget(self.cbo_rep)
-        left.addWidget(self.txt_file)
+        left.addWidget(self.cbo_file)
 
         nav = QHBoxLayout(); nav.addWidget(self.btn_prev); nav.addWidget(self.btn_next)
     
@@ -465,34 +468,24 @@ class ColorPlotPage(QWizardPage):
 
         group_analysis = self.wizard().group_analysis
         display_names_list = self.wizard().display_names_list
-        print(display_names_list)
-        names = self.wizard().display_names_list or []
-
         self.cbo_rep.clear()
         self.cbo_rep.addItems(display_names_list)
         self.cbo_rep.setCurrentIndex(def_index)
         self.cbo_rep.setEnabled(True)
         
-        if not names:
-            # no replicates → disable everything
+        if not display_names_list:
             self.cbo_rep.setEnabled(False)
-            self.txt_file.clear()
-            self.clear_all()   # blank the plots too
+            self.cbo_file.clear()
+            self.clear_all()
             return
         else:
             current_exp = group_analysis.get_single_experiments(def_index)
-            current_file = current_exp.get_spheroid_file(def_index)
-            current_file_name = os.path.basename(current_file.get_filepath())
-
-            self.txt_file.setText(current_file_name)
-
-            group_analysis = self.wizard().group_analysis
-            processed_data = current_file.get_processed_data()
-            metadata = current_file.get_metadata()
-            peak_pos = QSettings("HashemiLab", "NeuroStemVolt").value("peak_position")
-
-            self.main_plot.plot_color(processed_data=processed_data, peak_pos = peak_pos)
-            self.it_plot.plot_IT(processed_data=processed_data,metadata=metadata,peak_position=peak_pos)
+            file_names = [os.path.basename(current_exp.get_spheroid_file(i).get_filepath()) for i in range(current_exp.get_file_count())]
+            self.cbo_file.clear()
+            self.cbo_file.addItems(file_names)
+            self.cbo_file.setCurrentIndex(0)
+            self.cbo_file.setEnabled(True)
+            self.update_file_display()
 
     def clear_all(self):
         # reset indices
@@ -513,33 +506,37 @@ class ColorPlotPage(QWizardPage):
         self.current_file_index = 0
         self.update_file_display()
 
+    def on_file_changed(self, index):
+        self.current_file_index = index
+        self.update_file_display()
+
     def update_file_display(self):
         group_analysis = self.wizard().group_analysis
         try:
             exp = group_analysis.get_single_experiments(self.current_rep_index)
             sph_file = exp.get_spheroid_file(self.current_file_index)
             file_name = os.path.basename(sph_file.get_filepath())
-            self.txt_file.setText(file_name)
+            self.cbo_file.setCurrentText(file_name)
 
             processed_data = sph_file.get_processed_data()
             metadata = sph_file.get_metadata()
             peak_pos = QSettings("HashemiLab", "NeuroStemVolt").value("peak_position")
 
             self.main_plot.plot_color(processed_data=processed_data, peak_pos=peak_pos)
-            self.it_plot.plot_IT(processed_data=processed_data,metadata=metadata,peak_position=peak_pos)
+            self.it_plot.plot_IT(processed_data=processed_data, metadata=metadata, peak_position=peak_pos)
         except IndexError:
-            self.txt_file.setText("No file at this index")
+            self.cbo_file.setCurrentText("No file at this index")
 
     def on_next_clicked(self):
         exp = self.wizard().group_analysis.get_single_experiments(self.current_rep_index)
         if self.current_file_index < exp.get_file_count() - 1:
             self.current_file_index += 1
-            self.update_file_display()
+            self.cbo_file.setCurrentIndex(self.current_file_index)
 
     def on_prev_clicked(self):
         if self.current_file_index > 0:
             self.current_file_index -= 1
-            self.update_file_display()
+            self.cbo_file.setCurrentIndex(self.current_file_index)
 
     def run_processing(self):
         group_analysis = self.wizard().group_analysis
