@@ -242,7 +242,11 @@ class OutputManager:
             time_points = [i * interval for i in range(n_files)]
         
         # Build DataFrame with unpacked columns
-        df = pd.DataFrame(params_matrix, columns=["A_fit", "A_err", "tau_fit", "tau_err", "C_fit", "C_err", "t_half", "t_half_err"])
+        df = pd.DataFrame(params_matrix, columns=["A_fit",   "A_SE",   "A_SD",   "A_CI95",
+                    "tau_fit", "tau_SE", "tau_SD", "tau_CI95",
+                    "C_fit",   "C_SE",   "C_SD",   "C_CI95",
+                    "t_half",  "t_half_SE", "t_half_SD", "t_half_CI95"])
+        
         df["Y0"] = df["A_fit"] + df["C_fit"]
 
         df.insert(0, "Time", time_points)
