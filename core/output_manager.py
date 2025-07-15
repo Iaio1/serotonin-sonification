@@ -71,7 +71,7 @@ class OutputManager:
         columns = pd.MultiIndex.from_tuples(arrays, names=["Replicate", "File"])
         df = pd.DataFrame(data, columns=columns)
         df.index = time_seconds
-        df.index.name = "Time (seconds)"
+        df.index.name = "Time (s)"
 
         # Save to CSV
         output_IT_folder = os.path.join(output_folder_path, "all_replicates_ITs")
@@ -212,7 +212,7 @@ class OutputManager:
         columns = pd.MultiIndex.from_tuples(arrays, names=["Replicate", "File"])
         df = pd.DataFrame(curves_aligned, columns=columns)
         df.index = time_seconds
-        df.index.name = "Time (seconds)"
+        df.index.name = "Time (s)"
 
         # Save to CSV
         output_IT_folder = os.path.join(output_folder_path, "all_reuptakes")
