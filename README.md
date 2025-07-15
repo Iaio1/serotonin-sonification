@@ -22,8 +22,12 @@ Whether you're characterizing iPSC-derived neuronal systems or investigating neu
 ### **Data Pre-processing**
 - Interactive color plots and current-vs-time traces  
 - Multiple filtering options:
-  - Smoothing  
-  - Baseline correction  
+  - Baseline correction 
+  - Background subtraction, 
+  - Rolling mean, 
+  - Butterworth filtering 
+  - Savitzky-Golay
+  - Normalization.
 - Visualization of raw vs. filtered data
 
 ### **Spontaneous Activity Detection**
@@ -59,32 +63,69 @@ Whether you're characterizing iPSC-derived neuronal systems or investigating neu
 
 ## **Input Format**
 
-- **Accepted Input:** `.tsv` (tab-separated values) files  
-- See the `example_data` folder for formatting guidelines
+- **Supported Input:** `.txt` files containing color plot data (one per timepoint), formatted as tab- or space-separated values.
+- **How to Prepare Data:** Place all files for a replicate in a single folder.  
+- **Formatting Guidance:** See the `example_data` folder for sample file structure and formatting tips.
 
 ---
 
 ## **Applications**
 
-- Functional validation of iPSC-derived neuronal spheroids  
-- Neurotransmitter dynamics under pharmacological perturbation  
-- Drug screening and dose-response analysis  
-- Exploratory neurochemical research
+- Functional characterization of iPSC-derived neuronal spheroids
+- Analysis of neurotransmitter release and reuptake under pharmacological manipulation
+- Drug screening, dose-response profiling, and transporter kinetics studies
+- Exploratory research in neurochemical signaling and synaptic physiology
 
 ---
 
 ## **Output**
 
-**CSV Exports Of:**
-- Pre-processed (filtered) current-vs-time curves  
-- Peak detection results (timestamps, amplitudes)  
-- Reuptake decay constants and fit parameters
+**CSV Exports:**
+- Filtered and processed current-vs-time traces for each replicate and timepoint
+- Detected peak events with timestamps and amplitudes
+- Reuptake curve parameters, including decay constants and fit statistics
 
-**Plots Of:**
-- Color plots  
-- Current-vs-time traces  
-- Event annotations (where applicable)
+**Visualizations:**
+- Interactive color plots for each timepoint
+- Current-vs-time traces with event annotations
+- Summary plots for batch analysis and group
 
+---
 
+## Contributing
+
+1. Fork the repository.
+2. Create a feature branch (`git checkout -b feature-xyz`).
+3. Commit your changes.
+4. Push to your fork and submit a pull request.
+
+---
+
+## Dependencies
+
+Minimal environment (see `environment.yml`):
+
+- python >= 3.11
+- numpy
+- pandas
+- matplotlib
+- pyqt
+- scipy
+- pip (for packaging)
+- pyinstaller (for building executables)
+
+---
+
+## License
+
+[MIT License](LICENSE)  
+© 2025 Hashemi Lab · NeuroStemVolt
+
+---
+
+## Acknowledgements
+
+Developed by Pablo Prieto Roca and Tomas Andriuskevicius @Hashemi Lab.  
+For questions or support, contact [pp2023@imperial.ac.uk].
 
 
