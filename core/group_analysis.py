@@ -304,29 +304,51 @@ class GroupAnalysis:
         # tau: decay constant (guess as 1/3 of the time range)
         # C: baseline (last value of the mean trace)
         mean_trace = np.mean(cropped_ITs, axis=0)
-        A0 = float(np.max(mean_trace) - np.min(mean_trace))
-        tau0 = (n_timepoints - min_peak) / 3.0
-        C0 = float(mean_trace[-1])
-        p0 = [A0, tau0, C0]
+        #C0 = float(mean_trace[-1])
+        C0 = np.median(mean_trace[-10:])
+        #A0 = float(mean_trace[0])
+        A0 = np.mean(mean_trace[0:10])
+        k0 = 0.01
+        p0 = [k0]
 
-        print(f"Initial guess: A={A0:.2f}, tau={tau0:.2f}, C={C0:.2f}")
+            # Step 3: Fit k only, fix A0 and C0
+        def exp_decay_k_only(t, k):
+            return (A0 - C0) * np.exp(-k * t) + C0
 
-        # Fit
-        popt, pcov = curve_fit(exp_decay, time_all, ITs_flattened, p0=p0)
+        popt_k, pcov_k = curve_fit(exp_decay_k_only, time_all, ITs_flattened, p0=[k0])
+        k_fit = popt_k[0]
+        k_err = np.sqrt(np.diag(pcov_k))[0]
 
-        # Extract parameter estimates and standard errors
-        A_fit, tau_fit, C_fit = popt
-        perr = np.sqrt(np.diag(pcov))  # Approximate symmetric 1-sigma CI
-
-        print(f"Fit results:")
-        print(f"A   = {A_fit:.2f} ± {perr[0]:.2f}")
-        print(f"tau = {tau_fit:.2f} ± {perr[1]:.2f}")
-        print(f"C   = {C_fit:.2f} ± {perr[2]:.2f}")
-
+        tau_fit = 1 / k_fit
         t_half = np.log(2) * tau_fit
 
+        # Step 4: Fit A only, fix k and C0
+        def exp_decay_fixed_kC(t, A):
+            return (A - C0) * np.exp(-k_fit * t) + C0
+
+        popt_a, pcov_a = curve_fit(exp_decay_fixed_kC, time_all, ITs_flattened, p0=[A0])
+        A_fit = popt_a[0]
+        A_err = np.sqrt(np.diag(pcov_a))[0]
+
+        # Step 5: Fit C only, fix k and A
+        def exp_decay_fixed_kA(t, C):
+            return (A_fit - C) * np.exp(-k_fit * t) + C
+
+        popt_c, pcov_c = curve_fit(exp_decay_fixed_kA, time_all, ITs_flattened, p0=[C0])
+        C_fit = popt_c[0]
+        C_err = np.sqrt(np.diag(pcov_c))[0]
+
+        # Final report
+        print("Fit results (sequential):")
+        print(f"k = {k_fit:.4f} ± {k_err:.4f}")
+        print(f"A = {A_fit:.4f} ± {A_err:.4f}")
+        print(f"C = {C_fit:.4f} ± {C_err:.4f}")
+        print(f"Tau = {tau_fit:.4f}")
+        print(f"t_half = {t_half:.4f}")
+
         # Pre-allocated_ITs_array is the matrix with all data properly aligned on their peaks
-        return time_all, cropped_ITs, pre_allocated_ITs_array, t_half, popt, pcov,  A_fit, tau_fit, C_fit
+        #return time_all, cropped_ITs, pre_allocated_ITs_array, t_half, popt, pcov,  A_fit, tau_fit, C_fit
+        return time_all, cropped_ITs, pre_allocated_ITs_array, t_half, (A_fit, k_fit, C_fit), (A_err, k_err, C_err), min_peak
     
     def get_tau_over_time(self):
         """
@@ -338,9 +360,13 @@ class GroupAnalysis:
         tau_err_list = []
         for t in range(n_files):
             try:
-                _, _, _, _, popt, pcov, _, tau_fit, _ = self.exponential_fitting_replicated(replicate_time_point=t)
+                _, _, _, t_half, fit_vals, fit_errs, _ = self.exponential_fitting_replicated(replicate_time_point=t)
+                # fit_vals = (A_fit, k_fit, C_fit), fit_errs = (A_err, k_err, C_err)
+                k_fit = fit_vals[1]
+                k_err = fit_errs[1]
+                tau_fit = 1 / k_fit if k_fit != 0 else np.nan
+                tau_err = abs(k_err / (k_fit ** 2)) if k_fit != 0 else np.nan
                 tau_list.append(tau_fit)
-                tau_err = np.sqrt(np.diag(pcov))[1] if pcov is not None else np.nan
                 tau_err_list.append(tau_err)
             except Exception as e:
                 tau_list.append(np.nan)
@@ -354,16 +380,15 @@ class GroupAnalysis:
         Columns: A_fit, A_error, tau_fit, tau_error, C_fit, C_error
         Rows: replicate time points
         """
-        n_files = self.experiments[0].get_file_count() #16 timepoints for our current example
+        n_files = self.experiments[0].get_file_count()
         results = []
         for t in range(n_files):
             try:
-                _, _, _, _, popt, pcov, A_fit, tau_fit, C_fit = self.exponential_fitting_replicated(replicate_time_point=t)
-                if pcov is not None and pcov.shape == (3, 3):
-                    perr = np.sqrt(np.diag(pcov))
-                    A_err, tau_err, C_err = perr[0], perr[1], perr[2]
-                else:
-                    A_err, tau_err, C_err = np.nan, np.nan, np.nan
+                _, _, _, t_half, fit_vals, fit_errs, _ = self.exponential_fitting_replicated(replicate_time_point=t)
+                A_fit, k_fit, C_fit = fit_vals
+                A_err, k_err, C_err = fit_errs
+                tau_fit = 1 / k_fit if k_fit != 0 else np.nan
+                tau_err = abs(k_err / (k_fit ** 2)) if k_fit != 0 else np.nan
                 results.append([A_fit, A_err, tau_fit, tau_err, C_fit, C_err])
             except Exception as e:
                 results.append([np.nan]*6)
@@ -459,9 +484,11 @@ class GroupAnalysis:
         import numpy as np
 
         # 1) run your fit and get the aligned, cropped IT matrix
-        time_all, cropped_ITs, _, t_half, popt, pcov, A_fit, tau_fit, C_fit = \
+        time_all, cropped_ITs, _, t_half, fit_vals, fit_errs, _ = \
             self.exponential_fitting_replicated(replicate_time_point)
-        # cropped_ITs: shape (n_experiments, n_post_peak_points)
+        A_fit, k_fit, C_fit = fit_vals
+        A_err, k_err, C_err = fit_errs
+        tau_fit = 1 / k_fit if k_fit != 0 else np.nan
 
         # 2) build a “time since peak” axis
         n_exps, n_post = cropped_ITs.shape
@@ -473,16 +500,16 @@ class GroupAnalysis:
 
         # 4) smooth fit curve on that same relative axis
         t_fit_rel = np.linspace(0, n_post-1, 500)
-        y_fit     = A_fit * np.exp(-t_fit_rel / tau_fit) + C_fit
+        y_fit     = A_fit * np.exp(-t_fit_rel * k_fit) + C_fit
 
         # 5) 95% CI of the fit via Jacobian
-        dof  = max(0, len(time_all) - len(popt))
+        dof  = max(0, len(time_all) - 3)
         tval = t.ppf(0.975, dof)
-        # Jacobian of f(t) = A e^{-t/τ} + C wrt [A, τ, C]
         J        = np.empty((len(t_fit_rel), 3))
-        J[:, 0]  = np.exp(-t_fit_rel / tau_fit)
-        J[:, 1]  = A_fit * (t_fit_rel / tau_fit**2) * np.exp(-t_fit_rel / tau_fit)
+        J[:, 0]  = np.exp(-t_fit_rel * k_fit)
+        J[:, 1]  = -A_fit * t_fit_rel * np.exp(-t_fit_rel * k_fit)
         J[:, 2]  = 1
+        pcov = np.diag([A_err**2, k_err**2, C_err**2])
         ci       = np.sqrt(np.sum((J @ pcov) * J, axis=1)) * tval
         lower_ci = y_fit - ci
         upper_ci = y_fit + ci
@@ -490,35 +517,13 @@ class GroupAnalysis:
         # 6) start plotting
         fig, ax = plt.subplots(figsize=(10,6))
 
-        # a) each replicate in light gray
         for row in cropped_ITs:
             ax.plot(t_rel, row, color='gray', alpha=0.3, lw=1, label='_nolegend_')
-
-        # b) mean ± 1 SD ribbon
-        ax.fill_between(t_rel,
-                        mean_IT - std_IT,
-                        mean_IT + std_IT,
-                        color='C0', alpha=0.2,
-                        label='Mean ± 1 SD')
-
-        # c) mean trace
+        ax.fill_between(t_rel, mean_IT - std_IT, mean_IT + std_IT, color='C0', alpha=0.2, label='Mean ± 1 SD')
         ax.plot(t_rel, mean_IT, color='C0', lw=2, label='Mean trace')
-
-        # d) fitted exponential curve
         ax.plot(t_fit_rel, y_fit, color='C1', lw=2, label='Exp fit')
-
-        # e) 95% CI around the fit
-        ax.fill_between(t_fit_rel,
-                        lower_ci,
-                        upper_ci,
-                        color='C1', alpha=0.3,
-                        label='95% CI')
-
-        # f) half-life marker
-        ax.axvline(t_half, color='magenta', ls='--',
-                    label=f't½ ≈ {t_half:.1f} pts')
-
-        # 7) labels & styling
+        ax.fill_between(t_fit_rel, lower_ci, upper_ci, color='C1', alpha=0.3, label='95% CI')
+        ax.axvline(t_half, color='magenta', ls='--', label=f't½ ≈ {t_half:.1f} pts')
         ax.set_xlabel('Time since peak (points)', fontsize=12)
         ax.set_ylabel('Current (nA)', fontsize=12)
         ax.set_title('Post-peak IT decays & exponential fit', fontsize=14)
@@ -569,7 +574,7 @@ class GroupAnalysis:
         import numpy as np
 
         # Run the fitting function to get values and data
-        time_all, ITs_flattened, t_half, popt, pcov, A_fit, tau_fit, C_fit = self.exponential_fitting_replicated(replicate_time_point=replicate_time_point)
+        time_all, ITs_flattened, t_half, popt, pcov, A_fit, tau_fit, C_fit = self.exponential_fitting_replicated_legacy(replicate_time_point=replicate_time_point)
         A_fit, tau_fit, C_fit = popt
         perr = np.sqrt(np.diag(pcov))  # 1-sigma CI
 
@@ -640,7 +645,6 @@ class GroupAnalysis:
             plt.scatter(pos, all_ITs[i, pos], color='red', marker='x', s=10, label='Peak Position' if i == 0 else None, zorder=5)
 
         plt.xlabel("Time Points (seconds)")
-        print("File duration:", file_duration)
         # Set ticks at every 10 seconds => every 100 time points
         tick_locs = np.arange(0, 601, 100)       # 0, 100, 200, ..., 600
         tick_labels = [str(int(x / 10)) for x in tick_locs]  # convert to seconds: 0, 10, ..., 60

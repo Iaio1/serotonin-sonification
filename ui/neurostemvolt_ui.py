@@ -1036,7 +1036,7 @@ class PlotCanvas(FigureCanvas):
 
     def show_decay_exponential_fitting(self, group_analysis, replicate_time_point=0):
         """
-        Plots post-peak IT decays, mean trace, exponential fit, 95% CI, and half-life on the embedded canvas.
+        Plots post-peak IT decays, individual data points, exponential fit, 95% CI, and half-life on the embedded canvas.
         """
         from scipy.stats import t
         import numpy as np
@@ -1048,23 +1048,29 @@ class PlotCanvas(FigureCanvas):
             self.axes.set_title("No data to fit")
             self.draw()
             return
+        
+        time_all, cropped_ITs, _, t_half, fit_vals, fit_errs, min_peak = result
+        A_fit, k_fit, C_fit = fit_vals
+        A_err, k_err, C_err = fit_errs
+        tau_fit = 1 / k_fit if k_fit != 0 else np.nan
 
-        time_all, cropped_ITs, _, t_half, popt, pcov, A_fit, tau_fit, C_fit = result
         n_exps, n_post = cropped_ITs.shape
         t_rel = np.arange(n_post)
         mean_IT = np.nanmean(cropped_ITs, axis=0)
         std_IT  = np.nanstd (cropped_ITs, axis=0)
         t_fit_rel = np.linspace(0, n_post-1, 500)
-        y_fit     = A_fit * np.exp(-t_fit_rel / tau_fit) + C_fit
+        y_fit     = A_fit * np.exp(-t_fit_rel * k_fit) + C_fit
 
         # 95% CI of the fit via Jacobian
-        dof  = max(0, len(time_all) - len(popt))
+        dof  = max(0, len(time_all) - 3)
         tval = t.ppf(0.975, dof)
         J        = np.empty((len(t_fit_rel), 3))
-        J[:, 0]  = np.exp(-t_fit_rel / tau_fit)
-        J[:, 1]  = A_fit * (t_fit_rel / tau_fit**2) * np.exp(-t_fit_rel / tau_fit)
-        J[:, 2]  = 1
-        ci       = np.sqrt(np.sum((J @ pcov) * J, axis=1)) * tval
+        J = np.empty((len(t_fit_rel), 3))
+        J[:, 0] = np.exp(-t_fit_rel * k_fit)                            
+        J[:, 1] = -(A_fit - C_fit) * t_fit_rel * np.exp(-t_fit_rel * k_fit) 
+        J[:, 2] = 1 - np.exp(-t_fit_rel * k_fit)                        
+        pcov = np.diag([A_err**2, k_err**2, C_err**2])
+        ci = np.sqrt(np.sum((J @ pcov) * J, axis=1)) * tval
         lower_ci = y_fit - ci
         upper_ci = y_fit + ci
 
@@ -1075,11 +1081,12 @@ class PlotCanvas(FigureCanvas):
         for row in cropped_ITs:
             self.axes.plot(t_rel, row, color='gray', alpha=0.3, lw=1, label='_nolegend_')
 
-        # b) mean ± 1 SD ribbon
-        self.axes.fill_between(t_rel, mean_IT - std_IT, mean_IT + std_IT, color='C0', alpha=0.2, label='Mean ± 1 SD')
+        # b) individual data points used for fitting
+        ITs_flattened = cropped_ITs.flatten()
+        self.axes.scatter(time_all-min_peak, ITs_flattened, color='black', s=16, alpha=0.7, label='Data points')
 
-        # c) mean trace
-        self.axes.plot(t_rel, mean_IT, color='C0', lw=2, label='Mean trace')
+        # c) mean ± 1 SD ribbon
+        #self.axes.fill_between(t_rel, mean_IT - std_IT, mean_IT + std_IT, color='C0', alpha=0.2, label='Mean ± 1 SD')
 
         # d) fitted exponential curve
         self.axes.plot(t_fit_rel, y_fit, color='C1', lw=2, label='Exp fit')
@@ -1091,7 +1098,7 @@ class PlotCanvas(FigureCanvas):
         self.axes.axvline(t_half, color='magenta', ls='--', label=f't½ ≈ {t_half:.1f} pts')
 
         # 7) labels & styling
-        self.axes.set_xlabel('Time since peak (points)', fontsize=12)
+        self.axes.set_xlabel('Time (seconds)', fontsize=12)
         self.axes.set_ylabel('Current (nA)', fontsize=12)
         self.axes.set_title('Post-peak IT decays & exponential fit', fontsize=14)
         self.axes.legend(frameon=False)
