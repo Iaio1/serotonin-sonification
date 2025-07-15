@@ -1040,7 +1040,7 @@ class PlotCanvas(FigureCanvas):
         self.axes.axvline(t_half, color='magenta', ls='--', label=f't½ ≈ {t_half:.1f} pts')
 
         # 7) labels & styling
-        self.axes.set_xlabel('Time since peak (points)', fontsize=12)
+        self.axes.set_xlabel('Time (seconds)', fontsize=12)
         self.axes.set_ylabel('Current (nA)', fontsize=12)
         self.axes.set_title('Post-peak IT decays & exponential fit', fontsize=14)
         self.axes.legend(frameon=False)
