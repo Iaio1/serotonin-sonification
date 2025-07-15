@@ -250,15 +250,12 @@ class GroupAnalysis:
         mean_amplitudes = np.nanmean(all_amplitudes, axis=0)
         return time_points, mean_amplitudes, all_amplitudes, files_before_treatment
     
-    def exponential_fitting_replicated(self, replicate_time_point = 0, global_peak_amplitude_position=None):
+    def exponential_fitting_replicated(self, replicate_time_point=0, global_peak_amplitude_position=None):
         from scipy.optimize import curve_fit
         n_experiments = len(self.experiments)
         if n_experiments == 0:
-            return None, None, None, None
-        # Assume all experiments have the same number of files/timepoints
+            return None
         n_timepoints = self.experiments[0].get_file_time_points()
-        files_before_treatment = self.experiments[0].get_number_of_files_before_treatment() # This will be zero if no files before treatment
-        
         all_ITs = np.empty((n_experiments, n_timepoints))
         peak_amplitude_positions = []
 
@@ -266,6 +263,11 @@ class GroupAnalysis:
         for i, experiment in enumerate(self.experiments):
             file = experiment.get_spheroid_file(actual_index)
             IT_individual = file.get_processed_data_IT()
+            if IT_individual.shape[0] != n_timepoints:
+                raise ValueError(
+                    f"Replicate {i+1} has {IT_individual.shape[0]} time points, expected {n_timepoints}.\n"
+                    "All replicates must have the same number of time points."
+                )
             metadata = file.get_metadata()
             peak_amplitude_positions.append((metadata["peak_amplitude_positions"]))
             all_ITs[i, :] = IT_individual
