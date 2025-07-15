@@ -57,6 +57,10 @@ class GroupAnalysis:
         #print("Replicates Cleared")
         #print(self.get_experiments())
 
+    def clear_single_experiment(self, index):
+        """Remove single experiment from group analysis"""
+        del self.experiments[index]
+
     def set_processing_options_exp(self, processors = None):
         for exp in self.experiments:
             exp.set_processing_steps(processors)

@@ -1,9 +1,9 @@
 from PyQt5.QtWidgets import (
     QWidget, QApplication, QWizard, QComboBox, QLineEdit, QWizardPage, QLabel, QPushButton, QVBoxLayout, QHBoxLayout,
-    QListWidget, QFileDialog, QInputDialog, QGridLayout, QFormLayout, QLineEdit, QDialog, QCheckBox, QDialogButtonBox, QMessageBox
+    QListWidget, QFileDialog, QInputDialog, QGridLayout, QFormLayout, QLineEdit, QDialog, QCheckBox, QDialogButtonBox, QMessageBox, QShortcut
 )
 from PyQt5.QtCore import QSettings, Qt
-from PyQt5.QtGui import QIcon
+from PyQt5.QtGui import QIcon, QKeySequence
 
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
@@ -33,8 +33,15 @@ class IntroPage(QWizardPage):
         # This will hold the current experiment settings
         self.experiment_settings = None
 
-        # 1) Add the ListWidget & “Load” button
+        # Add the ListWidget & “Load” button
         self.list_widget = QListWidget()
+
+        # after creating self.list_widget we try and catch if the 
+        # user is using delete to get rid of a single experiment
+        self.delete_sc = QShortcut(Qt.Key_Backspace, self.list_widget)
+        self.delete_sc.setContext(Qt.WidgetWithChildrenShortcut)
+        self.delete_sc.activated.connect(self._on_delete_selected)
+
         apply_custom_styles(self.list_widget)
         self.btn_new = QPushButton("Clear Replicates")
         apply_custom_styles(self.btn_new)
@@ -165,6 +172,24 @@ class IntroPage(QWizardPage):
         self.wizard().display_names_list = self.display_names_list
         return True
     
+    def _on_delete_selected(self):
+        
+        wiz = self.wizard()
+    
+        selected = self.list_widget.selectedItems()
+
+        rows = sorted((self.list_widget.row(item) for item in selected), reverse=True)
+        
+        for row in rows:
+            self.list_widget.takeItem(row)
+            del self.display_names_list[row]
+            self.group_analysis.clear_single_experiment(row)
+        
+        # push the updated data back onto the wizard
+        wiz.display_names_list = self.display_names_list
+        wiz.group_analysis     = self.group_analysis
+
+        self.completeChanged.emit()
 
 class ExperimentSettingsDialog(QDialog):
     def __init__(self, parent=None, defaults=None):
