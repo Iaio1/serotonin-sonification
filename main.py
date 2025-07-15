@@ -1,9 +1,12 @@
-from ui.neurostemvolt_ui import *
 from PyQt5.QtGui import QIcon, QPixmap
 from PyQt5.QtCore import Qt, QTimer
-from PyQt5.QtWidgets import QSplashScreen, QApplication
+from PyQt5.QtWidgets import QSplashScreen, QApplication, QWizard
 import sys
 import os
+
+from ui.wizard_1_intro.intro_page import IntroPage
+from ui.wizard_2_colorplot.colorplot_page import ColorPlotPage
+from ui.wizard_3_results.results_page import ResultsPage
 
 def main():
     # Enable high DPI to show loading image in high quality
@@ -14,7 +17,7 @@ def main():
     
     # Load and scale the splash image
     base = os.path.dirname(__file__)
-    logo_path = os.path.join(base, 'ui/LogoNeuroStemVoltV1.0.0.png')
+    logo_path = os.path.join(base, 'ui/graphics/LogoNeuroStemVoltV1.0.0.png')
     
     # Check if file exists
     if not os.path.exists(logo_path):
@@ -60,7 +63,6 @@ def main():
     
     # Show splash and force immediate update
     splash.show()
-    #splash.showMessage("Loading...", Qt.AlignBottom | Qt.AlignCenter, Qt.white)
     app.processEvents()  # Force the splash to render immediately
     
     # Create wizard (but don't show yet)
@@ -115,12 +117,7 @@ def main():
     
     wizard.setWindowTitle("NeuroStemVolt")
     
-    # Fix the empty space issue
-    wizard.setWizardStyle(QWizard.ModernStyle)  # Try different styles if needed
-    #wizard.setFixedSize(700, 600)  # Set a specific size to eliminate extra space
-    # wizard.resize(700, 600)  # Alternative: set initial size but allow resizing
-    
-    icon_path = os.path.join(os.path.dirname(__file__), "ui", "NSV_Logo_Icon.png")
+    icon_path = os.path.join(base, "ui", "ui/graphics/NSV_Logo_Icon.png")
     app.setWindowIcon(QIcon(icon_path))
     wizard.addPage(IntroPage())
     wizard.addPage(ColorPlotPage())
