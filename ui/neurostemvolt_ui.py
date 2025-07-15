@@ -1,6 +1,6 @@
 from PyQt5.QtWidgets import (
     QWidget, QApplication, QWizard, QComboBox, QLineEdit, QWizardPage, QLabel, QPushButton, QVBoxLayout, QHBoxLayout,
-    QListWidget, QFileDialog, QInputDialog, QGridLayout, QFormLayout, QLineEdit, QDialog, QCheckBox, QDialogButtonBox, QMessageBox, QShortcut
+    QListWidget, QFileDialog, QInputDialog, QGridLayout, QFormLayout, QLineEdit, QDialog, QCheckBox, QDialogButtonBox, QMessageBox, QShortcut, QProgressDialog
 )
 from PyQt5.QtCore import QSettings, Qt
 from PyQt5.QtGui import QIcon, QKeySequence
@@ -567,6 +567,15 @@ class ColorPlotPage(QWizardPage):
         group_analysis = self.wizard().group_analysis
         peak_pos = QSettings("HashemiLab", "NeuroStemVolt").value("peak_position", type=int)
 
+        # Show loading dialog
+        progress = QProgressDialog("Processing data, please wait...", None, 0, 0, self)
+        progress.setWindowModality(Qt.ApplicationModal)
+        progress.setAutoClose(True)
+        progress.setAutoReset(True)
+        progress.setMinimumDuration(0)
+        progress.show()
+        QApplication.processEvents()  # Ensure dialog appears
+
         # Always include FindAmplitude, but ensure it's not duplicated
         user_processors = self.selected_processors or []
         mandatory = FindAmplitude(peak_pos)
@@ -579,6 +588,9 @@ class ColorPlotPage(QWizardPage):
             exp.run()
 
         self.update_file_display()
+        progress.close()
+        self.update_file_display()
+
 
     def revert_processing(self):
         group_analysis = self.wizard().group_analysis
@@ -639,7 +651,7 @@ class ProcessingOptionsDialog(QDialog):
         # List of available processors and their default checked state
         self.processor_options = [
             ("Background Subtraction", True),
-            ("Gaussian Smoothing 2D", False),
+            #("Gaussian Smoothing 2D", False),
             ("Rolling Mean", False),
             ("Butterworth Filter", True),
             ("Savitzky-Golay Filter", False),
@@ -657,7 +669,7 @@ class ProcessingOptionsDialog(QDialog):
 
         help_texts = {
             "Background Subtraction": "Removes background offset based on early values.",
-            "Gaussian Smoothing 2D": "Applies 2D Gaussian blur to reduce noise.",
+            #"Gaussian Smoothing 2D": "Applies 2D Gaussian blur to reduce noise.",
             "Rolling Mean": "Applies a moving average to smooth the trace.",
             "Butterworth Filter": "Applies a low-pass filter while preserving waveform.",
             "Savitzky-Golay Filter": "Fits local polynomials to smooth data.",
@@ -1035,9 +1047,25 @@ class PlotCanvas(FigureCanvas):
         self.draw()
 
     def show_decay_exponential_fitting(self, group_analysis, replicate_time_point=0):
-        """
-        Plots post-peak IT decays, individual data points, exponential fit, 95% CI, and half-life on the embedded canvas.
-        """
+        from PyQt5.QtWidgets import QMessageBox
+        try:
+            result = group_analysis.exponential_fitting_replicated(replicate_time_point)
+        except ValueError as e:
+            QMessageBox.warning(
+                self,
+                "Dimension Mismatch",
+                f"Error: {str(e)}\n\nPlease ensure all replicates have the same number of time points."
+            )
+            self.axes.clear()
+            self.axes.set_title("Dimension mismatch error")
+            self.draw()
+            return
+        if result is None:
+            self.axes.clear()
+            self.axes.set_title("No data to fit")
+            self.draw()
+            return
+        
         from scipy.stats import t
         import numpy as np
 
