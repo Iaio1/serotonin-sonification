@@ -1,9 +1,9 @@
 from PyQt5.QtWidgets import (
     QWidget, QApplication, QWizard, QComboBox, QLineEdit, QWizardPage, QLabel, QPushButton, QVBoxLayout, QHBoxLayout,
-    QListWidget, QFileDialog, QInputDialog, QGridLayout, QFormLayout, QLineEdit, QDialog, QCheckBox, QDialogButtonBox, QMessageBox
+    QListWidget, QFileDialog, QInputDialog, QGridLayout, QFormLayout, QLineEdit, QDialog, QCheckBox, QDialogButtonBox, QMessageBox, QShortcut
 )
 from PyQt5.QtCore import QSettings, Qt
-from PyQt5.QtGui import QIcon
+from PyQt5.QtGui import QIcon, QKeySequence
 
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
@@ -24,6 +24,7 @@ class IntroPage(QWizardPage):
         # Initialising the group_analysis object
         self.group_analysis = GroupAnalysis()
         self.display_names_list = []
+        self.number_of_files = 0
 
         self.registerField("replicateCount*", self, "replicateCount")
 
@@ -32,8 +33,15 @@ class IntroPage(QWizardPage):
         # This will hold the current experiment settings
         self.experiment_settings = None
 
-        # 1) Add the ListWidget & “Load” button
+        # Add the ListWidget & “Load” button
         self.list_widget = QListWidget()
+
+        # after creating self.list_widget we try and catch if the 
+        # user is using delete to get rid of a single experiment
+        self.delete_sc = QShortcut(Qt.Key_Backspace, self.list_widget)
+        self.delete_sc.setContext(Qt.WidgetWithChildrenShortcut)
+        self.delete_sc.activated.connect(self._on_delete_selected)
+
         apply_custom_styles(self.list_widget)
         self.btn_new = QPushButton("Clear Replicates")
         apply_custom_styles(self.btn_new)
@@ -96,9 +104,10 @@ class IntroPage(QWizardPage):
 
     def load_replicate(self):
         """Ask the user to pick a folder, build & run the SpheroidExperiment, and display it."""
-        
+
         if self.experiment_settings is None:
             if not self.show_experiment_settings_dialog():
+                self.load_replicate()
                 return   # user cancelled, bail out
 
         settings = self.experiment_settings
@@ -114,6 +123,19 @@ class IntroPage(QWizardPage):
         if not paths:
             # optional: warn “no .txt found”
             return
+        
+        if self.number_of_files != 0 and self.number_of_files != len(paths):
+            QMessageBox.warning(
+                self,
+                "Warning! Missing Files!",
+                "Folders do not contain the same number of files.\n"
+                f"Expected: {self.number_of_files}, Found: {len(paths)}"
+            )
+            return
+        
+        # If first replicate, set number_of_files
+        if self.number_of_files == 0:
+            self.number_of_files = len(paths)
 
         filtered = {k: v for k, v in settings.items() if k != "output_folder"}
         exp = SpheroidExperiment(paths,**filtered)
@@ -150,6 +172,24 @@ class IntroPage(QWizardPage):
         self.wizard().display_names_list = self.display_names_list
         return True
     
+    def _on_delete_selected(self):
+        
+        wiz = self.wizard()
+    
+        selected = self.list_widget.selectedItems()
+
+        rows = sorted((self.list_widget.row(item) for item in selected), reverse=True)
+        
+        for row in rows:
+            self.list_widget.takeItem(row)
+            del self.display_names_list[row]
+            self.group_analysis.clear_single_experiment(row)
+        
+        # push the updated data back onto the wizard
+        wiz.display_names_list = self.display_names_list
+        wiz.group_analysis     = self.group_analysis
+
+        self.completeChanged.emit()
 
 class ExperimentSettingsDialog(QDialog):
     def __init__(self, parent=None, defaults=None):
@@ -181,11 +221,8 @@ class ExperimentSettingsDialog(QDialog):
         #self.cb_waveform    = QComboBox();  self.cb_waveform.addItems(["5HT","Else"])
         #self.cb_waveform.setCurrentText(defaults["waveform"]);                     form.addRow("Waveform:", self.cb_waveform)
 
-        self.le_file_length = QLineEdit(str(defaults["file_length"]))
-        form.addRow("File Length (seconds):", make_labeled_field_with_help(
-            "File Length (seconds)", self.le_file_length,
-            "Total duration (in seconds) of each recorded file."
-        ))
+        self.cb_file_type = QComboBox(); self.cb_file_type.addItems(["None","Spontaneous","Stimulation"])
+        self.cb_file_type.setCurrentText(defaults["file_type"]);                   form.addRow("File Type:", self.cb_file_type)
 
         self.le_acq_freq = QLineEdit(str(defaults["acquisition_frequency"]))  
         form.addRow("Acquisition Frequency (Hz):", make_labeled_field_with_help(
@@ -193,9 +230,15 @@ class ExperimentSettingsDialog(QDialog):
             "Sampling rate of the acquisition system, in Hertz (Hz)."
         ))
 
+        self.le_file_length = QLineEdit(str(defaults["file_length"]))
+        form.addRow("File Length (seconds):", make_labeled_field_with_help(
+            "File Length (seconds)", self.le_file_length,
+            "Total duration (in seconds) of each recorded file."
+        ))
+
         self.le_peak_pos = QLineEdit(str(defaults["peak_position"])) 
-        form.addRow("Peak Position (Voltage):", make_labeled_field_with_help(
-            "Peak Position (Voltage)", self.le_peak_pos,
+        form.addRow("Peak Position:", make_labeled_field_with_help(
+            "Peak Position", self.le_peak_pos,
             "Expected position of the signal peak on the voltage axis (e.g., 257 for 5HT). "
             "You may enter an approximate value and adjust it later after identifying the actual peak."
         ))
@@ -218,9 +261,6 @@ class ExperimentSettingsDialog(QDialog):
             "Number of recording files acquired before applying the treatment "
             "(e.g., 3 untreated files, followed by treated ones)."
         ))
-
-        self.cb_file_type = QComboBox(); self.cb_file_type.addItems(["None","Spontaneous","Stimulation"])
-        self.cb_file_type.setCurrentText(defaults["file_type"]);                   form.addRow("File Type:", self.cb_file_type)
 
         # store loaded stim_params so get_settings() can return it if user doesn’t change it
         self.stim_params = defaults["stim_params"]
@@ -256,14 +296,14 @@ class ExperimentSettingsDialog(QDialog):
                 return  # abort if they cancelled stim-params
 
         # now persist *all* fields
-        self.qsettings.setValue("file_length",           int(self.le_file_length.text()))
+        self.qsettings.setValue("file_type",             self.cb_file_type.currentText())
         self.qsettings.setValue("acquisition_frequency", int(self.le_acq_freq.text()))
+        self.qsettings.setValue("file_length",           int(self.le_file_length.text()))
         self.qsettings.setValue("peak_position",         int(self.le_peak_pos.text()))
         self.qsettings.setValue("treatment",             self.le_treatment.text())
         #self.qsettings.setValue("waveform",              self.cb_waveform.currentText())
         self.qsettings.setValue("time_between_files",    int(self.le_time_btw.text()))
         self.qsettings.setValue("files_before_treatment",int(self.le_files_before.text()))
-        self.qsettings.setValue("file_type",             self.cb_file_type.currentText())
         self.qsettings.setValue("output_folder", self.le_output_folder.text())
         # stim_params → JSON string
         print("Saving stim_params:", self.stim_params)
@@ -293,28 +333,49 @@ class StimParamsDialog(QDialog):
         self.setWindowTitle("Stimulation Parameters")
         form = QFormLayout(self)
         self.edits = {}
-        params = ["start", "duration", "frequency", "amplitude", "pulses"]
-        defaults = defaults or {"start": 5.0, "duration": 2.0, "frequency": 20, "amplitude": 0.5, "pulses": 50}
+        self.params = ["start", "frequency", "amplitude", "pulses"]
+        defaults = defaults or {"start": 5.0, "frequency": 20, "amplitude": 0.5, "pulses": 50}
         help_texts = {
             "start": "Start time of stimulation in minutes.",
-            "duration": "Duration of stimulation pulse in seconds.",
+            "pulses": "Total number of stimulation pulses.",
             "frequency": "Frequency of stimulation pulses in Hz.",
-            "amplitude": "Amplitude of stimulation current in nA.",
-            "pulses": "Total number of stimulation pulses."
+            "amplitude": "Amplitude of stimulation current in uA.",
         }
 
-        for p in params:
+        for p in self.params:
             edit = QLineEdit(str(defaults[p]))
             help_widget = make_labeled_field_with_help(p.capitalize(), edit, help_texts[p])
             form.addRow(f"{p.capitalize()}:", help_widget)
             self.edits[p] = edit
+
         buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
         form.addRow(buttons)
 
     def get_params(self):
-        return {k: float(self.edits[k].text()) for k in self.edits}
+        """Return parameters as a dict, including calculated duration."""
+        params = {}
+
+        # Get user inputs
+        for p in self.params:
+            try:
+                params[p] = float(self.edits[p].text())
+            except ValueError:
+                params[p] = 0.0
+
+        # Calculate duration
+        try:
+            pulses = params["pulses"]
+            frequency = params["frequency"]
+            params["duration"] = pulses / frequency if frequency != 0 else 0.0
+            print(pulses)
+            print(frequency)
+            print(params["duration"])
+        except KeyError:
+            params["duration"] = 0.0
+
+        return params
 
 
 ### Second Page
@@ -340,9 +401,12 @@ class ColorPlotPage(QWizardPage):
         
         #### Handle the signal from cbo_rep
 
-        self.txt_file = QLineEdit(); 
+        #self.txt_file = QLineEdit(); 
         #apply_custom_styles(self.txt_file)
-        self.txt_file.setReadOnly(True)
+        #self.txt_file.setReadOnly(True)
+
+        self.cbo_file = QComboBox()
+        self.cbo_file.currentIndexChanged.connect(self.on_file_changed)
 
         # Default indexes to visualize
         self.current_rep_index = 0
@@ -373,14 +437,14 @@ class ColorPlotPage(QWizardPage):
 
         left = QVBoxLayout()
         left.addWidget(self.btn_revert)
-        left.addWidget(self.btn_eval)
         left.addWidget(self.cbo_rep)
-        left.addWidget(self.txt_file)
+        left.addWidget(self.cbo_file)
 
         nav = QHBoxLayout(); nav.addWidget(self.btn_prev); nav.addWidget(self.btn_next)
     
         left.addLayout(nav)
         left.addWidget(self.btn_filter)
+        left.addWidget(self.btn_eval)
         #left.addWidget(btn_apply)
         left.addWidget(self.btn_save)
         left.addWidget(self.btn_export)
@@ -429,34 +493,24 @@ class ColorPlotPage(QWizardPage):
 
         group_analysis = self.wizard().group_analysis
         display_names_list = self.wizard().display_names_list
-        print(display_names_list)
-        names = self.wizard().display_names_list or []
-
         self.cbo_rep.clear()
         self.cbo_rep.addItems(display_names_list)
         self.cbo_rep.setCurrentIndex(def_index)
         self.cbo_rep.setEnabled(True)
         
-        if not names:
-            # no replicates → disable everything
+        if not display_names_list:
             self.cbo_rep.setEnabled(False)
-            self.txt_file.clear()
-            self.clear_all()   # blank the plots too
+            self.cbo_file.clear()
+            self.clear_all()
             return
         else:
             current_exp = group_analysis.get_single_experiments(def_index)
-            current_file = current_exp.get_spheroid_file(def_index)
-            current_file_name = os.path.basename(current_file.get_filepath())
-
-            self.txt_file.setText(current_file_name)
-
-            group_analysis = self.wizard().group_analysis
-            processed_data = current_file.get_processed_data()
-            metadata = current_file.get_metadata()
-            peak_pos = QSettings("HashemiLab", "NeuroStemVolt").value("peak_position")
-
-            self.main_plot.plot_color(processed_data=processed_data, peak_pos = peak_pos)
-            self.it_plot.plot_IT(processed_data=processed_data,metadata=metadata,peak_position=peak_pos)
+            file_names = [os.path.basename(current_exp.get_spheroid_file(i).get_filepath()) for i in range(current_exp.get_file_count())]
+            self.cbo_file.clear()
+            self.cbo_file.addItems(file_names)
+            self.cbo_file.setCurrentIndex(0)
+            self.cbo_file.setEnabled(True)
+            self.update_file_display()
 
     def clear_all(self):
         # reset indices
@@ -477,33 +531,37 @@ class ColorPlotPage(QWizardPage):
         self.current_file_index = 0
         self.update_file_display()
 
+    def on_file_changed(self, index):
+        self.current_file_index = index
+        self.update_file_display()
+
     def update_file_display(self):
         group_analysis = self.wizard().group_analysis
         try:
             exp = group_analysis.get_single_experiments(self.current_rep_index)
             sph_file = exp.get_spheroid_file(self.current_file_index)
             file_name = os.path.basename(sph_file.get_filepath())
-            self.txt_file.setText(file_name)
+            self.cbo_file.setCurrentText(file_name)
 
             processed_data = sph_file.get_processed_data()
             metadata = sph_file.get_metadata()
             peak_pos = QSettings("HashemiLab", "NeuroStemVolt").value("peak_position")
 
             self.main_plot.plot_color(processed_data=processed_data, peak_pos=peak_pos)
-            self.it_plot.plot_IT(processed_data=processed_data,metadata=metadata,peak_position=peak_pos)
+            self.it_plot.plot_IT(processed_data=processed_data, metadata=metadata, peak_position=peak_pos)
         except IndexError:
-            self.txt_file.setText("No file at this index")
+            self.cbo_file.setCurrentText("No file at this index")
 
     def on_next_clicked(self):
         exp = self.wizard().group_analysis.get_single_experiments(self.current_rep_index)
         if self.current_file_index < exp.get_file_count() - 1:
             self.current_file_index += 1
-            self.update_file_display()
+            self.cbo_file.setCurrentIndex(self.current_file_index)
 
     def on_prev_clicked(self):
         if self.current_file_index > 0:
             self.current_file_index -= 1
-            self.update_file_display()
+            self.cbo_file.setCurrentIndex(self.current_file_index)
 
     def run_processing(self):
         group_analysis = self.wizard().group_analysis
