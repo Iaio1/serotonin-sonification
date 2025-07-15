@@ -242,8 +242,14 @@ class OutputManager:
             time_points = [i * interval for i in range(n_files)]
         
         # Build DataFrame with unpacked columns
-        df = pd.DataFrame(params_matrix, columns=["A_fit", "A_err", "tau_fit", "tau_err", "C_fit", "C_err"])  
+        df = pd.DataFrame(params_matrix, columns=["A_fit", "A_err", "tau_fit", "tau_err", "C_fit", "C_err", "t_half", "t_half_err"])
+        df["Y0"] = df["A_fit"] + df["C_fit"]
+
         df.insert(0, "Time", time_points)
+         
+        cols = list(df.columns)
+        cols.insert(1, cols.pop(cols.index("Y0")))
+        df = df[cols]
 
         # Save to CSV
         output_folder = os.path.join(output_folder_path, "all_exponential_fit_params")

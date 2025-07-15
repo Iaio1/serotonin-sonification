@@ -378,9 +378,11 @@ class GroupAnalysis:
     def get_exponential_fit_params_over_time(self):
         """
         Runs exponential_fitting_replicated for each replicate time point,
-        collects A, tau, C and their errors, and returns them as a 2D numpy array.
-        Columns: A_fit, A_error, tau_fit, tau_error, C_fit, C_error
+        collects A, tau, C, t_half and their errors, and returns them as a 2D numpy array.
+        Columns: A_fit, A_error, tau_fit, tau_error, C_fit, C_error, t_half, t_half_error
         Rows: replicate time points
+        The errors here are the standard error of the different quantities, in other words, 
+        what is computed is the one-sigma (≈ 68 % coverage) standard error.
         """
         n_files = self.experiments[0].get_file_count()
         results = []
@@ -391,9 +393,11 @@ class GroupAnalysis:
                 A_err, k_err, C_err = fit_errs
                 tau_fit = 1 / k_fit if k_fit != 0 else np.nan
                 tau_err = abs(k_err / (k_fit ** 2)) if k_fit != 0 else np.nan
-                results.append([A_fit, A_err, tau_fit, tau_err, C_fit, C_err])
+                t_half = np.log(2) * tau_fit if k_fit != 0 else np.nan
+                t_half_err = abs(np.log(2) * tau_err) if k_fit != 0 else np.nan
+                results.append([A_fit, A_err, tau_fit, tau_err, C_fit, C_err, t_half, t_half_err])
             except Exception as e:
-                results.append([np.nan]*6)
+                results.append([np.nan]*8)
         return np.array(results)
     
     def exponential_fitting_replicated_legacy(self, replicate_time_point = 0, global_peak_amplitude_position=None):
