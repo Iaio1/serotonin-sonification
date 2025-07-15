@@ -237,8 +237,8 @@ class ExperimentSettingsDialog(QDialog):
         ))
 
         self.le_peak_pos = QLineEdit(str(defaults["peak_position"])) 
-        form.addRow("Peak Position (Voltage):", make_labeled_field_with_help(
-            "Peak Position (Voltage)", self.le_peak_pos,
+        form.addRow("Peak Position:", make_labeled_field_with_help(
+            "Peak Position", self.le_peak_pos,
             "Expected position of the signal peak on the voltage axis (e.g., 257 for 5HT). "
             "You may enter an approximate value and adjust it later after identifying the actual peak."
         ))
