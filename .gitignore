@@ -2,6 +2,7 @@ data/
 output/
 core/__pycache__/
 core/processing/__pycache__/
+ui/__pycache__/
 *.pyc
 3d_plot_animation.mp4
 ui/.DS_Store
