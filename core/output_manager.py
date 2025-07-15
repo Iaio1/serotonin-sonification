@@ -2,6 +2,7 @@ from core.spheroid_experiment import SpheroidExperiment
 from core.group_analysis import GroupAnalysis
 import os
 import pandas as pd
+import numpy as np
 
 class OutputManager:
     @staticmethod
@@ -62,10 +63,15 @@ class OutputManager:
                         row.append(None)
             data.append(row)
 
+        # Create time axis in seconds
+        acq_freq = group_experiments.get_single_experiments(0).get_acquisition_frequency()
+        time_seconds = np.arange(n_timepoints) / acq_freq
+
         # Create MultiIndex columns
         columns = pd.MultiIndex.from_tuples(arrays, names=["Replicate", "File"])
         df = pd.DataFrame(data, columns=columns)
-        df.index.name = "TimePoint"
+        df.index = time_seconds
+        df.index.name = "Time (seconds)"
 
         # Save to CSV
         output_IT_folder = os.path.join(output_folder_path, "all_replicates_ITs")
@@ -100,6 +106,7 @@ class OutputManager:
                 os.mkdir(output_IT_folder)
             output_path = os.path.join(output_IT_folder, output_csv)
             df.to_csv(output_path, index_label="TimePoint")
+
     @staticmethod
     def save_peak_amplitudes_metrics(group_experiments : GroupAnalysis, output_folder_path):
         # This function saves the following keys per file in a folder named metadata_files
@@ -187,6 +194,10 @@ class OutputManager:
         curves = group_experiments.get_all_reuptake_curves()
         curves_aligned = curves.T #Our structure of the matrix is like save_all_ITs
 
+        # Create time axis in seconds
+        acq_freq = group_experiments.get_single_experiments(0).get_acquisition_frequency()
+        time_seconds = np.arange(curves_aligned.shape[0]) / acq_freq
+
         # Initialise the matrix
         arrays = []
         data = []
@@ -200,7 +211,8 @@ class OutputManager:
         # Create MultiIndex columns
         columns = pd.MultiIndex.from_tuples(arrays, names=["Replicate", "File"])
         df = pd.DataFrame(curves_aligned, columns=columns)
-        df.index.name = "TimePoint"
+        df.index = time_seconds
+        df.index.name = "Time (seconds)"
 
         # Save to CSV
         output_IT_folder = os.path.join(output_folder_path, "all_reuptakes")
