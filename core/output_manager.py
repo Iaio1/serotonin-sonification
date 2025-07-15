@@ -248,7 +248,9 @@ class OutputManager:
                     "t_half",  "t_half_SE", "t_half_SD", "t_half_CI95"])
         
         df["Y0"] = df["A_fit"] + df["C_fit"]
-
+        df["Y0_SE"] = np.sqrt(df["A_SE"]**2 + df["C_SE"]**2)
+        df["Y0_SD"] = np.sqrt(df["A_SD"]**2 + df["C_SD"]**2)
+        df["Y0_CI95"] = np.sqrt(df["A_CI95"]**2 + df["C_CI95"]**2)
         df.insert(0, "Time", time_points)
          
         cols = list(df.columns)

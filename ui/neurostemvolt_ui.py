@@ -604,9 +604,9 @@ class ColorPlotPage(QWizardPage):
             selected_names = dlg.get_selected_processors()
             peak_pos = QSettings("HashemiLab", "NeuroStemVolt").value("peak_position", type=int)
             self.selected_processors = [
-                ProcessingOptionsDialog.get_processor_instance(name, peak_pos)
+                dlg.get_processor_instance(name, peak_pos)
                 for name in selected_names
-                if ProcessingOptionsDialog.get_processor_instance(name, peak_pos) is not None
+                if dlg.get_processor_instance(name, peak_pos) is not None
             ]
 
     def validatePage(self):
@@ -643,49 +643,119 @@ class ColorPlotPage(QWizardPage):
 class ProcessingOptionsDialog(QDialog):
     def __init__(self, parent=None, defaults=None):
         super().__init__(parent)
-
         self.setWindowTitle("Filtering Options")
-
         self.qsettings = QSettings("HashemiLab", "NeuroStemVolt")
 
-        # List of available processors and their default checked state
         self.processor_options = [
             ("Background Subtraction", True),
-            #("Gaussian Smoothing 2D", False),
             ("Rolling Mean", False),
+            #("Gaussian Smoothing 2D", False)
             ("Butterworth Filter", True),
             ("Savitzky-Golay Filter", False),
             ("Baseline Correction", True),
             ("Normalize", True),
             ("Find Amplitude", True),
-            #("Exponential Fitting", True),
         ]
 
         self.checkboxes = {}
+        self.param_widgets = {}
         layout = QVBoxLayout()
 
         saved = self.qsettings.value("processing_pipeline", type=str)
         saved_selection = json.loads(saved) if saved else []
 
         help_texts = {
-            "Background Subtraction": "Removes background offset based on early values.",
+            "Background Subtraction": "Subtracts baseline offset by averaging the signal between a specified 'start' and 'end' segment (given as data indices or time points at the beginning of the trace) and subtracting that mean from the entire recording.",
+            "Rolling Mean": "Smooths the trace by computing a moving average over a sliding window of N points. The 'window size' parameter sets how many consecutive samples are included in each average. Larger windows yield smoother traces but can blur sharp features.",
             #"Gaussian Smoothing 2D": "Applies 2D Gaussian blur to reduce noise.",
-            "Rolling Mean": "Applies a moving average to smooth the trace.",
             "Butterworth Filter": "Applies a low-pass filter while preserving waveform.",
-            "Savitzky-Golay Filter": "Fits local polynomials to smooth data.",
+            "Savitzky-Golay Filter": "Fits a local polynomial of a given 'order' over each segment of the data to smooth noise. The 'window size' sets how many points are used per fit, while 'order' (the 'p' polynomial order) controls how closely the fit can follow rapid changes.",
             "Baseline Correction": "Removes baseline drift from the signal.",
-            "Normalize": "Normalizes each trace based on peak amplitude.",
+            "Normalize": "Normalizes each trace based on the peak amplitude of the first file within each replicate.",
         }
 
         for name, default_checked in self.processor_options:
             if name == "Find Amplitude":
                 continue
+
+            # Create a vertical layout for each filter option
+            filter_layout = QVBoxLayout()
+            filter_layout.setSpacing(2)
+            filter_layout.setContentsMargins(0, 0, 0, 0)
+
             cb = QCheckBox(name)
             cb.setChecked(name in saved_selection if saved_selection else default_checked)
+            cb.setStyleSheet("font-weight: bold; font-size: 12px;")
             help_widget = make_labeled_field_with_help(name, cb, help_texts.get(name, "No help available."))
-            layout.addWidget(help_widget)
+            filter_layout.addWidget(help_widget)
             self.checkboxes[name] = cb
-        
+
+            # Parameter widget (hidden by default)
+            param_widget = None
+
+            if name == "Background Subtraction":
+                region_layout = QHBoxLayout()
+                region_label = QLabel("Region (start, end) in seconds:")
+                region_label.setStyleSheet("font-size: 11px; color: #555; margin-left: 16px;")
+                region_start = QLineEdit("0")
+                region_end = QLineEdit("10")
+                region_layout.addWidget(region_label)
+                region_layout.addWidget(region_start)
+                region_layout.addWidget(region_end)
+                region_container = QWidget()
+                region_container.setLayout(region_layout)
+                region_container.setContentsMargins(24, 0, 0, 0)  # Indent
+                region_container.hide()
+                param_widget = region_container
+                self.param_widgets[name] = (region_start, region_end)
+            elif name == "Savitzky-Golay Filter":
+                sg_layout = QHBoxLayout()
+                sg_label_w = QLabel("Window:")
+                sg_label_w.setStyleSheet("font-size: 11px; color: #555; margin-left: 16px;")
+                sg_window = QLineEdit("20")
+                sg_label_o = QLabel("Order:")
+                sg_label_o.setStyleSheet("font-size: 11px; color: #555;")
+                sg_order = QLineEdit("2")
+                sg_layout.addWidget(sg_label_w)
+                sg_layout.addWidget(sg_window)
+                sg_layout.addWidget(sg_label_o)
+                sg_layout.addWidget(sg_order)
+                sg_container = QWidget()
+                sg_container.setLayout(sg_layout)
+                sg_container.setContentsMargins(24, 0, 0, 0)  # Indent
+                sg_container.hide()
+                param_widget = sg_container
+                self.param_widgets[name] = (sg_window, sg_order)
+            elif name == "Rolling Mean":
+                rm_layout = QHBoxLayout()
+                rm_label = QLabel("Window Size:")
+                rm_label.setStyleSheet("font-size: 11px; color: #555; margin-left: 16px;")
+                rm_window = QLineEdit("5")
+                rm_layout.addWidget(rm_label)
+                rm_layout.addWidget(rm_window)
+                rm_container = QWidget()
+                rm_container.setLayout(rm_layout)
+                rm_container.setContentsMargins(24, 0, 0, 0)  # Indent
+                rm_container.hide()
+                param_widget = rm_container
+                self.param_widgets[name] = rm_window
+
+            # Add parameter widget to filter layout if it exists
+            if param_widget:
+                filter_layout.addWidget(param_widget)
+
+                # Show/hide parameter widget based on checkbox
+                def toggle_widget(checked, widget=param_widget):
+                    widget.setVisible(checked)
+                cb.stateChanged.connect(toggle_widget)
+                # Set initial visibility
+                param_widget.setVisible(cb.isChecked())
+
+            # Add the filter layout to the main dialog layout
+            filter_container = QWidget()
+            filter_container.setLayout(filter_layout)
+            layout.addWidget(filter_container)
+
         # Dialog buttons
         buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         buttons.accepted.connect(self.accept)
@@ -694,17 +764,34 @@ class ProcessingOptionsDialog(QDialog):
 
         self.setLayout(layout)
 
-    def get_processor_instance(name, peak_position=None):
+    def get_processor_instance(self, name, peak_position=None):
         if name == "Background Subtraction":
-            return BackgroundSubtraction(region=(0, 10))
+            region_start, region_end = self.param_widgets[name]
+            try:
+                start = int(region_start.text())
+                end = int(region_end.text())
+            except ValueError:
+                start, end = 0, 10
+            return BackgroundSubtraction(region=(start, end))
+        elif name == "Savitzky-Golay Filter":
+            sg_window, sg_order = self.param_widgets[name]
+            try:
+                w = int(sg_window.text())
+                p = int(sg_order.text())
+            except ValueError:
+                w, p = 20, 2
+            return SavitzkyGolayFilter(w=w, p=p)
+        elif name == "Rolling Mean":
+            rm_window = self.param_widgets[name]
+            try:
+                window_size = int(rm_window.text())
+            except ValueError:
+                window_size = 5
+            return RollingMean(window_size=window_size)
         elif name == "Gaussian Smoothing 2D":
             return GaussianSmoothing2D()
-        elif name == "Rolling Mean":
-            return RollingMean()
         elif name == "Butterworth Filter":
             return ButterworthFilter()
-        elif name == "Savitzky-Golay Filter":
-            return SavitzkyGolayFilter(w=20, p=2)
         elif name == "Baseline Correction":
             return BaselineCorrection()
         elif name == "Normalize":

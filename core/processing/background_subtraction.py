@@ -13,8 +13,13 @@ class BackgroundSubtraction(Processor):
         """
         self.region = region
 
-    def process(self, data, context=None):
+    def process(self, data, context):
+        acq_freq = context["acquisition_frequency"]
         start, end = self.region
+        start = start * acq_freq
+        end = end * acq_freq
+
+        print(start, end)
         # compute mean CV over that region (axis=1 is voltage sweep)
         baseline = np.mean(data[:, start:end], axis=1, keepdims=True)
         #print(f"Baseline shape: {baseline.shape}, Data shape: {data.shape}")
