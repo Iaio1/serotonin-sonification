@@ -23,7 +23,7 @@ class IntroPage(QWizardPage):
 
         self.registerField("replicateCount*", self, "replicateCount")
 
-        # This will hold our backend experiment objects
+        # This will hold the backend experiment objects
         self.stim_params = None
         # This will hold the current experiment settings
         self.experiment_settings = None
@@ -31,8 +31,8 @@ class IntroPage(QWizardPage):
         # Add the ListWidget & “Load” button
         self.list_widget = QListWidget()
 
-        # after creating self.list_widget we try and catch if the 
-        # user is using delete to get rid of a single experiment
+        # after creating self.list_widget try and catch if the 
+        # user is using backspace to get rid of a single experiment
         self.delete_sc = QShortcut(Qt.Key_Backspace, self.list_widget)
         self.delete_sc.setContext(Qt.WidgetWithChildrenShortcut)
         self.delete_sc.activated.connect(self._on_delete_selected)
@@ -48,7 +48,7 @@ class IntroPage(QWizardPage):
         apply_custom_styles(self.btn_exp_settings)
         self.btn_exp_settings.clicked.connect(self.show_experiment_settings_dialog)
         
-        # 3) Layout
+        # Layout
         v = QVBoxLayout()
         v.addWidget(self.btn_new)
         v.addWidget(self.btn_load)
@@ -151,7 +151,7 @@ class IntroPage(QWizardPage):
     def validatePage(self):
         """
         This is called automatically when the user clicks 'Continue'.
-        We can use it to stash our replicates on the wizard for later pages.
+        It can be used to stash our replicates on the wizard for later pages.
         """
         # e.g. store into the wizard object:
         self.wizard().group_analysis = self.group_analysis

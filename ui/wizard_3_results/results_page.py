@@ -17,7 +17,7 @@ class ResultsPage(QWizardPage):
     def __init__(self, parent=None):
         super().__init__(parent)
 
-        # — Analysis buttons —
+        # analysis buttons
         btn_avg    = QPushButton("Average Over Experiments");      apply_custom_styles(btn_avg)
         btn_fit    = QPushButton("Decay Exponential Fitting");     apply_custom_styles(btn_fit)
         btn_param  = QPushButton("Tau Over Time");                 apply_custom_styles(btn_param)
@@ -30,14 +30,14 @@ class ResultsPage(QWizardPage):
         analysis.addWidget(btn_param,  1, 0)
         analysis.addWidget(btn_amp,    1, 1)
 
-        # — Save/Export buttons —
+        # save/export buttons
         btn_save     = QPushButton("Save Current Plot");          apply_custom_styles(btn_save)
         btn_save_all = QPushButton("Save All Plots");             apply_custom_styles(btn_save_all)
         btn_export   = QPushButton("Export metrics as csv");      apply_custom_styles(btn_export)
 
         self.analysis_buttons = [btn_avg, btn_fit, btn_param, btn_amp, btn_save, btn_save_all, btn_export]
 
-        # — Placeholder & PlotCanvas —
+        # placeholder & plotCanvas
         self.placeholder = QLabel("Select an analysis option to show plot")
         self.placeholder.setAlignment(Qt.AlignCenter)
         self.result_plot = PlotCanvas(self, width=5, height=4)
@@ -56,22 +56,22 @@ class ResultsPage(QWizardPage):
         btn_save_all.clicked.connect(self.save_all_plots)
         btn_export.clicked.connect(self.export_all_as_csv)
 
-        # — Layout assembly —
+        # layout assembly
         main_layout = QVBoxLayout(self)
 
-        # 1) Analysis buttons at top
+        # analysis buttons at top
         main_layout.addLayout(analysis)
 
-        # 2) Save/Export
+        # save/export
         main_layout.addWidget(btn_save)
         main_layout.addWidget(btn_save_all)
         main_layout.addWidget(btn_export)
 
-        # 3) placeholder + future plot
+        # placeholder + future plot
         main_layout.addWidget(self.placeholder, stretch=1)
         main_layout.addWidget(self.result_plot, stretch=3)
 
-        # 4) footer
+        # footer
         footer = QLabel("© 2025 Hashemi Lab · NeuroStemVolt · v1.0.0")
         footer.setAlignment(Qt.AlignCenter)
         footer.setStyleSheet("color: gray; font-size: 10pt;")
