@@ -49,9 +49,9 @@ class SpheroidExperiment:
         else:
             self.waveform = waveform
 
-        self.files = [SpheroidFile(fp, self.waveform) for fp in sorted(filepaths, key=extract_timepoint)]
-        self.file_length = file_length
         self.acquisition_frequency = acquisition_frequency
+        self.files = [SpheroidFile(fp,  self.acquisition_frequency, self.waveform) for fp in sorted(filepaths, key=extract_timepoint)]
+        self.file_length = file_length
         self.peak_position = peak_position
         self.treatment = treatment
         self.time_between_files = time_between_files

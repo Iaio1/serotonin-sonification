@@ -21,9 +21,10 @@ class SpheroidFile:
     - metadata: A dictionary to hold any additional metadata related to the file.
     """
 
-    def __init__(self, filepath, waveform="5HT"):
+    def __init__(self, filepath, acq_freq, waveform="5HT"):
         self.filepath = filepath
         self.raw_data = self.load_data()
+        self.acq_freq = acq_freq
         self.processed_data = self.raw_data
         # Default peak position for serotonin (5HT) in FSCV plots
         self.peak_position = 257

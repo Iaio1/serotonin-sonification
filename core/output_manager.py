@@ -269,8 +269,17 @@ class OutputManager:
     def save_IT_profile(spheroid_file, output_path):
         processed_data_IT = spheroid_file.get_processed_data_IT()
 
+        n_timepoints = spheroid_file.timeframe
+        # Create time axis in seconds
+        acq_freq = spheroid_file.acq_freq
+
+        print("n_timepoints:", n_timepoints,      "→", type(n_timepoints))
+        print("acq_freq:   ", acq_freq,           "→", type(acq_freq))
+        time_seconds = np.arange(float(n_timepoints)) / float(acq_freq)
+
         df = pd.DataFrame(processed_data_IT)
-        df.index.name = "TimePoint"
+        df.index = time_seconds
+        df.index.name = "Time (s)"
 
         base_name = os.path.splitext(os.path.basename(spheroid_file.get_filepath()))[0]  # Remove .txt
         df.columns = [base_name]
