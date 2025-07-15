@@ -78,7 +78,7 @@ def main():
         QPushButton {
             background-color: #21AE62;
             color: white;
-            font-family: Helvetica;
+            font-family: Helvetica, Arial;
             font-weight: bold;
             border-radius: 10px;
             padding: 6px 12px;
@@ -99,7 +99,7 @@ def main():
         QPushButton {
             background-color: #CCCCCC;
             color: black;
-            font-family: Helvetica;
+            font-family: Helvetica, Arial;
             border-radius: 10px;
             padding: 6px 12px;
         }
