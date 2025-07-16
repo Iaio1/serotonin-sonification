@@ -18,17 +18,17 @@ class ResultsPage(QWizardPage):
         super().__init__(parent)
 
         # analysis buttons
-        btn_avg    = QPushButton("Average Over Experiments");      apply_custom_styles(btn_avg)
+        btn_avg    = QPushButton("Mean Amplitude Over Experiments");      apply_custom_styles(btn_avg)
         btn_fit    = QPushButton("Decay Exponential Fitting");     apply_custom_styles(btn_fit)
         btn_param  = QPushButton("Tau Over Time");                 apply_custom_styles(btn_param)
-        btn_amp    = QPushButton("Amplitudes Over Time");          apply_custom_styles(btn_amp)
+        btn_amp    = QPushButton("Individual Amplitudes Over Time");          apply_custom_styles(btn_amp)
 
         # grid of analysis buttons
         analysis = QGridLayout()
         analysis.addWidget(btn_avg,    0, 0)
-        analysis.addWidget(btn_fit,    0, 1)
+        analysis.addWidget(btn_fit,    1, 1)
         analysis.addWidget(btn_param,  1, 0)
-        analysis.addWidget(btn_amp,    1, 1)
+        analysis.addWidget(btn_amp,    0, 1)
 
         # save/export buttons
         btn_save     = QPushButton("Save Current Plot");          apply_custom_styles(btn_save)
