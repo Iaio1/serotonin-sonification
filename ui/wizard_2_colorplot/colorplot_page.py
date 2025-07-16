@@ -114,7 +114,7 @@ class ColorPlotPage(QWizardPage):
         footer.setAlignment(Qt.AlignCenter)
         footer.setStyleSheet("""
             color: gray;
-            font-family: Helvetica;
+            font-family: Helvetica, Arial;
             font-size: 10pt;
             margin-top: 12px;
         """)
