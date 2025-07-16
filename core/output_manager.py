@@ -80,6 +80,17 @@ class OutputManager:
         df.to_csv(output_path)
         print(f"Saved all ITs for all replicates to {output_path}")
 
+        df_paired = df.swaplevel("Replicate","File", axis=1)   \
+                      .sort_index(axis=1)                    
+
+        paired_folder = os.path.join(output_folder_path,
+                                     "all_replicates_ITs_paired")
+        os.makedirs(paired_folder, exist_ok=True)
+        paired_path = os.path.join(paired_folder,
+                                   "All_ITs_all_replicates_paired_by_file.csv")
+        df_paired.to_csv(paired_path)
+        print(f"Saved paired ITs (same file side-by-side) to {paired_path}")
+        
     @staticmethod
     def save_original_ITs(group_experiments : GroupAnalysis, output_folder_path):
         # This function takes all experiments (after processing) 
@@ -175,6 +186,7 @@ class OutputManager:
         output_path = os.path.join(output_folder, "All_amplitudes_all_replicates.csv")
         df.to_csv(output_path, index=False)
         print(f"Saved all amplitudes for all replicates to {output_path}")
+
     @staticmethod
     def save_all_reuptake_curves(group_experiments : GroupAnalysis, output_folder_path):
         """
@@ -220,6 +232,17 @@ class OutputManager:
         output_path = os.path.join(output_IT_folder, "All_reuptakes.csv")
         df.to_csv(output_path)
         print(f"Saved all reuptakes for all replicates to {output_path}")
+
+        df_paired = df.swaplevel("Replicate","File", axis=1)   \
+                      .sort_index(axis=1)                    
+
+        paired_folder = os.path.join(output_folder_path,
+                                     "all_reuptakes_paired")
+        os.makedirs(paired_folder, exist_ok=True)
+        paired_path = os.path.join(paired_folder,
+                                   "All_reuptakes_paired_by_file.csv")
+        df_paired.to_csv(paired_path)
+        print(f"Saved paired ITs (same file side-by-side) to {paired_path}")
 
     @staticmethod
     def save_all_exponential_fitting_params(group_experiments : GroupAnalysis, output_folder_path):
