@@ -249,7 +249,7 @@ class PlotCanvas(FigureCanvas):
 
         # b) individual data points used for fitting
         ITs_flattened = cropped_ITs.flatten()
-        t_data = (np.array(time_all) - min_peak) / freq
+        t_data = (np.array(time_all)) / freq
         self.axes.scatter(t_data, ITs_flattened, color='black', s=16, alpha=0.7, label='Data points')
 
         # d) fitted exponential curve
