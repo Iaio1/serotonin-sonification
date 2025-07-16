@@ -1,6 +1,7 @@
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 from PyQt5.QtWidgets import QProgressDialog, QApplication
+from PyQt5.QtCore import QSettings
 import numpy as np
 
 from PyQt5.QtCore import Qt
@@ -71,13 +72,18 @@ class PlotCanvas(FigureCanvas):
         """
         self.fig.clear()
         self.axes.clear()
+        
+        settings = QSettings("HashemiLab", "NeuroStemVolt")
+        freq = settings.value("acquisition_frequency", 10, type=int)
 
         self.axes = self.fig.add_subplot(111)
 
         profile = processed_data[:, peak_position]
+        n = profile.shape[0]
+        t = np.arange(n) / freq   # in seconds
 
         # Plot the main profile
-        self.axes.plot(profile, label="I-T Profile", color='#4178F2', linewidth=1.5)
+        self.axes.plot(t, profile, label="I-T Profile", color='#4178F2', linewidth=1.5)
 
         # Plot peak markers if metadata is provided
         if metadata and 'peak_amplitude_positions' in metadata:
@@ -87,8 +93,8 @@ class PlotCanvas(FigureCanvas):
             if isinstance(peak_indices, (list, np.ndarray)) and isinstance(peak_values, (list, np.ndarray)):
                 for idx, val in zip(peak_indices, peak_values):
                     if 0 <= idx < len(profile):
-                        self.axes.scatter(idx, val, color='#FF3877', zorder=5)
-                        self.axes.annotate(f"{val:.2f}", (idx, val), textcoords="offset points",
+                        self.axes.scatter(t[idx], val, color='#FF3877', zorder=5)
+                        self.axes.annotate(f"{val:.2f}", (t[idx], val), textcoords="offset points",
                                            xytext=(0, 10), ha='center', fontsize=9, color='#FF3877')
             else:
                 # Assume single value
@@ -96,14 +102,14 @@ class PlotCanvas(FigureCanvas):
                     idx = int(peak_indices)
                     val = float(peak_values)
                     if 0 <= idx < len(profile):
-                        self.axes.scatter(idx, val, color='#FF3877', zorder=5)
-                        self.axes.annotate(f"{val:.2f}", (idx, val), textcoords="offset points",
+                        self.axes.scatter(t[idx], val, color='#FF3877', zorder=5)
+                        self.axes.annotate(f"{val:.2f}", (t[idx], val), textcoords="offset points",
                                            xytext=(0, 10), ha='center', fontsize=9, color='#FF3877')
                 except Exception:
                     pass
 
         # Axis labeling and formatting
-        self.axes.set_xlabel("Time Points")
+        self.axes.set_xlabel("Time (seconds)")
         self.axes.set_ylabel("Current (nA)")
         title = "I-T Profile"
         if peak_position is not None:
@@ -111,6 +117,11 @@ class PlotCanvas(FigureCanvas):
         self.axes.set_title(title, fontweight="bold")
         self.axes.grid(False)
         self.axes.legend()
+
+        max_t = t[-1]
+        tick_interval = 5  # seconds
+        ticks = np.arange(0, max_t + tick_interval, tick_interval)
+        self.axes.set_xticks(ticks)
 
         #self.fig.tight_layout()
         # Render to canvas
