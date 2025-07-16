@@ -31,6 +31,9 @@ class ProcessingOptionsDialog(QDialog):
         saved = self.qsettings.value("processing_pipeline", type=str)
         saved_selection = json.loads(saved) if saved else []
 
+        saved = self.qsettings.value("processing_params", type=str)
+        saved_params = json.loads(saved) if saved else {}
+
         help_texts = {
             "Background Subtraction": "Subtracts baseline offset by averaging the signal between a specified 'start' and 'end' segment (given as data indices or time points at the beginning of the trace) and subtracting that mean from the entire recording.",
             "Rolling Mean": "Smooths the trace by computing a moving average over a sliding window of N points. The 'window size' parameter sets how many consecutive samples are included in each average. Larger windows yield smoother traces but can blur sharp features.",
@@ -66,6 +69,10 @@ class ProcessingOptionsDialog(QDialog):
                 region_label.setStyleSheet("font-size: 11px; color: #555; margin-left: 16px;")
                 region_start = QLineEdit("0")
                 region_end = QLineEdit("10")
+                if "Background Subtraction" in saved_params:
+                    start_str, end_str = saved_params["Background Subtraction"]
+                    region_start.setText(start_str)
+                    region_end.setText(end_str)
                 region_layout.addWidget(region_label)
                 region_layout.addWidget(region_start)
                 region_layout.addWidget(region_end)
@@ -83,6 +90,10 @@ class ProcessingOptionsDialog(QDialog):
                 sg_label_o = QLabel("Order:")
                 sg_label_o.setStyleSheet("font-size: 11px; color: #555;")
                 sg_order = QLineEdit("2")
+                if "Savitzky-Golay Filter" in saved_params:
+                    w, p = saved_params["Savitzky-Golay Filter"]
+                    sg_window.setText(w)
+                    sg_order.setText(p)
                 sg_layout.addWidget(sg_label_w)
                 sg_layout.addWidget(sg_window)
                 sg_layout.addWidget(sg_label_o)
@@ -98,6 +109,8 @@ class ProcessingOptionsDialog(QDialog):
                 rm_label = QLabel("Window Size:")
                 rm_label.setStyleSheet("font-size: 11px; color: #555; margin-left: 16px;")
                 rm_window = QLineEdit("5")
+                if "Rolling Mean" in saved_params:
+                    rm_window.setText(saved_params["Rolling Mean"])
                 rm_layout.addWidget(rm_label)
                 rm_layout.addWidget(rm_window)
                 rm_container = QWidget()
@@ -177,4 +190,16 @@ class ProcessingOptionsDialog(QDialog):
     def accept(self):
         selected = self.get_selected_processors()
         self.qsettings.setValue("processing_pipeline", json.dumps(selected))
+
+        # now save params
+        out = {}
+        for name, widget in self.param_widgets.items():
+            if isinstance(widget, tuple):
+                # multiple-lineEdits
+                out[name] = [w.text() for w in widget]
+            else:
+                out[name] = widget.text()
+
+        self.qsettings.setValue("processing_params", json.dumps(out))
+
         super().accept()

@@ -294,6 +294,8 @@ class GroupAnalysis:
 
         A = np.arange(min_peak, n_timepoints-max_peak)
         print(np.shape(A))
+        n_post = n_timepoints - max_peak - min_peak
+        A = np.arange(n_post)               # 0,1,2,... in samples
         time_all = np.tile(A, n_experiments)  # Repeat time point
         print(np.shape(time_all))
 
