@@ -252,10 +252,10 @@ class OutputManager:
         df["Y0_SD"] = np.sqrt(df["A_SD"]**2 + df["C_SD"]**2)
         df["Y0_CI95"] = np.sqrt(df["A_CI95"]**2 + df["C_CI95"]**2)
         df.insert(0, "Time", time_points)
-         
-        cols = list(df.columns)
-        cols.insert(1, cols.pop(cols.index("Y0")))
-        df = df[cols]
+
+        y0_cols = ["Y0", "Y0_SE", "Y0_SD", "Y0_CI95"]
+        new_order = ["Time"] + y0_cols + [c for c in df.columns if c not in (["Time"] + y0_cols)]
+        df = df[new_order]
 
         # Save to CSV
         output_folder = os.path.join(output_folder_path, "all_exponential_fit_params")
