@@ -251,6 +251,7 @@ class OutputManager:
         """
         params_matrix = group_experiments.get_exponential_fit_params_over_time()
         experiments = group_experiments.get_experiments()
+        freq = experiments[0].get_acquisition_frequency()
         n_experiments = len(experiments)
         n_files = experiments[0].get_file_count()
         n_before = experiments[0].get_number_of_files_before_treatment()
@@ -279,6 +280,16 @@ class OutputManager:
         y0_cols = ["Y0", "Y0_SE", "Y0_SD", "Y0_CI95"]
         new_order = ["Time"] + y0_cols + [c for c in df.columns if c not in (["Time"] + y0_cols)]
         df = df[new_order]
+
+        df["tau_fit"]    = df["tau_fit"]    / freq
+        df["tau_SE"]     = df["tau_SE"]     / freq
+        df["tau_SD"]     = df["tau_SD"]     / freq
+        df["tau_CI95"]   = df["tau_CI95"]   / freq
+
+        df["t_half"]     = df["t_half"]     / freq
+        df["t_half_SE"]  = df["t_half_SE"]  / freq
+        df["t_half_SD"]  = df["t_half_SD"]  / freq
+        df["t_half_CI95"]= df["t_half_CI95"]/ freq
 
         # Save to CSV
         output_folder = os.path.join(output_folder_path, "all_exponential_fit_params")
