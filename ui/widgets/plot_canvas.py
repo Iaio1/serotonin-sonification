@@ -184,6 +184,9 @@ class PlotCanvas(FigureCanvas):
         progress.show()
         QApplication.processEvents()  # Ensure dialog appears
 
+        settings = QSettings("HashemiLab", "NeuroStemVolt")
+        freq = settings.value("acquisition_frequency", 10, type=int)
+
         try:
             result = group_analysis.exponential_fitting_replicated(replicate_time_point)
         except ValueError as e:
@@ -210,16 +213,20 @@ class PlotCanvas(FigureCanvas):
         # Get fit and aligned ITs from group_analysis
         # result = group_analysis.exponential_fitting_replicated(replicate_time_point)
         time_all, cropped_ITs, _, t_half, fit_vals, fit_errs, min_peak = result
+
         A_fit, k_fit, C_fit = fit_vals
         A_err, k_err, C_err = fit_errs
         tau_fit = 1 / k_fit if k_fit != 0 else np.nan
 
         n_exps, n_post = cropped_ITs.shape
-        t_rel = np.arange(n_post)
+        t_rel = np.arange(n_post) / freq        # seconds
+
         mean_IT = np.nanmean(cropped_ITs, axis=0)
         std_IT  = np.nanstd (cropped_ITs, axis=0)
-        t_fit_rel = np.linspace(0, n_post-1, 500)
-        y_fit     = A_fit * np.exp(-t_fit_rel * k_fit) + C_fit
+        # do the fit in sample‐point space, then map to seconds:
+        t_fit_pts = np.linspace(0, n_post-1, 500)          # in points
+        y_fit     = (A_fit - C_fit) * np.exp(-k_fit * t_fit_pts) + C_fit
+        t_fit_rel = t_fit_pts / freq                       # now in seconds
 
         # 95% CI of the fit via Jacobian
         dof  = max(0, len(time_all) - 3)
@@ -242,7 +249,8 @@ class PlotCanvas(FigureCanvas):
 
         # b) individual data points used for fitting
         ITs_flattened = cropped_ITs.flatten()
-        self.axes.scatter(time_all-min_peak, ITs_flattened, color='black', s=16, alpha=0.7, label='Data points')
+        t_data = (np.array(time_all) - min_peak) / freq
+        self.axes.scatter(t_data, ITs_flattened, color='black', s=16, alpha=0.7, label='Data points')
 
         # d) fitted exponential curve
         self.axes.plot(t_fit_rel, y_fit, color='C1', lw=2, label='Exp fit')
@@ -251,7 +259,8 @@ class PlotCanvas(FigureCanvas):
         self.axes.fill_between(t_fit_rel, lower_ci, upper_ci, color='C1', alpha=0.3, label='95% CI')
 
         # f) half-life marker
-        self.axes.axvline(t_half, color='magenta', ls='--', label=f't½ ≈ {t_half:.1f} pts')
+        t_half_s = t_half / freq
+        self.axes.axvline(t_half_s, color='magenta', ls='--',label=f't½ ≈ {t_half_s:.2f} s')
 
         # 7) labels & styling
         self.axes.set_xlabel('Time (seconds)', fontsize=12)
@@ -260,6 +269,13 @@ class PlotCanvas(FigureCanvas):
         self.axes.legend(frameon=False)
         self.axes.grid(False)
         self.fig.tight_layout()
+
+        max_t = t_rel[-1]  # since t_rel is in seconds
+
+        tick_interval = 5  # seconds
+        ticks = np.arange(0, max_t + tick_interval, tick_interval)
+        self.axes.set_xticks(ticks)
+
         self.draw()
         progress.close()
 
