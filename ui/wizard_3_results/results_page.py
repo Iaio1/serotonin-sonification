@@ -1,5 +1,5 @@
 from PyQt5.QtWidgets import (
-    QWizardPage, QLabel, QPushButton, QVBoxLayout, QFileDialog, QGridLayout, QDialog, QMessageBox
+    QWizardPage, QLabel, QPushButton, QVBoxLayout, QFileDialog, QGridLayout, QDialog, QMessageBox, QProgressDialog, QApplication
 )
 from PyQt5.QtCore import QSettings, Qt
 
@@ -88,24 +88,41 @@ class ResultsPage(QWizardPage):
         plot_fn()
 
     def export_all_as_csv(self):
-        """Export all relevant metrics as CSV files using OutputManager."""
         output_folder = QSettings("HashemiLab", "NeuroStemVolt").value("output_folder")
-        group_analysis = self.wizard().group_analysis
         if not output_folder or not os.path.isdir(output_folder):
-            QMessageBox.warning(self, "No Output Folder", "Please set a valid output folder in Experiment Settings.")
+            QMessageBox.warning(
+                self, "No Output Folder",
+                "Please set a valid output folder in Experiment Settings."
+            )
             return
 
-        # Save all relevant CSVs using OutputManager
-        OutputManager.save_all_ITs(group_analysis, output_folder)
-        OutputManager.save_all_peak_amplitudes(group_analysis, output_folder)
-        OutputManager.save_all_reuptake_curves(group_analysis, output_folder)
-        OutputManager.save_all_exponential_fitting_params(group_analysis, output_folder)
+        # create & show the indeterminate progress dialog
+        progress = QProgressDialog("Exporting CSV files…", None, 0, 0, self)
+        progress.setWindowModality(Qt.WindowModal)
+        progress.setCancelButton(None)    # hide the cancel button
+        progress.setMinimumDuration(0)    # show immediately
+        progress.setAutoClose(False)
+        progress.show()
+        QApplication.processEvents()      # force a repaint
 
-        QMessageBox.information(
-            self,
-            "CSV Export Complete",
-            f"All metrics exported as CSV files to:\n{output_folder}"
-        )
+        try:
+            ga = self.wizard().group_analysis
+            OutputManager.save_all_ITs(ga, output_folder)
+            OutputManager.save_all_peak_amplitudes(ga, output_folder)
+            OutputManager.save_all_reuptake_curves(ga, output_folder)
+            OutputManager.save_all_exponential_fitting_params(ga, output_folder)
+        except Exception as e:
+            QMessageBox.critical(
+                self, "Export Failed",
+                f"An error occurred while exporting:\n{e}"
+            )
+        else:
+            QMessageBox.information(
+                self, "CSV Export Complete",
+                f"All metrics exported to:\n{output_folder}"
+            )
+        finally:
+            progress.hide()
 
     def save_current_plot(self):
         """Save the currently displayed plot as a PNG file."""
@@ -128,16 +145,36 @@ class ResultsPage(QWizardPage):
         if not output_folder or not os.path.isdir(output_folder):
             QMessageBox.warning(self, "No Output Folder", "Please set a valid output folder in Experiment Settings.")
             return
+        
+        # create & show the indeterminate progress dialog
+        progress = QProgressDialog("Exporting plots...", None, 0, 0, self)
+        progress.setWindowModality(Qt.WindowModal)
+        progress.setCancelButton(None)    # hide the cancel button
+        progress.setMinimumDuration(0)    # show immediately
+        progress.setAutoClose(False)
+        progress.show()
+        QApplication.processEvents()      # force a repaint
 
-        # Save all group-level plots using OutputManager
-        OutputManager.save_mean_ITs_plot(group_analysis, output_folder)
-        OutputManager.save_plot_tau_over_time(group_analysis, output_folder)
-        OutputManager.save_plot_exponential_fit_aligned(group_analysis, output_folder)
-        OutputManager.save_plot_all_amplitudes_over_time(group_analysis, output_folder)
-        OutputManager.save_plot_mean_amplitudes_over_time(group_analysis, output_folder)
-        # Add more OutputManager plot saves as needed
-
-        QMessageBox.information(self, "Plots Saved", f"All group-level plots saved to:\n{os.path.join(output_folder, 'plots')}")
+        try:
+            # Save all group-level plots using OutputManager
+            OutputManager.save_mean_ITs_plot(group_analysis, output_folder)
+            OutputManager.save_plot_tau_over_time(group_analysis, output_folder)
+            OutputManager.save_plot_exponential_fit_aligned(group_analysis, output_folder)
+            OutputManager.save_plot_all_amplitudes_over_time(group_analysis, output_folder)
+            OutputManager.save_plot_mean_amplitudes_over_time(group_analysis, output_folder)
+            # Add more OutputManager plot saves as needed
+        except Exception as e:
+            QMessageBox.critical(
+                self, "Export Failed",
+                f"An error occurred while exporting:\n{e}"
+            )
+        else:
+            QMessageBox.information(
+                self, "Plots Export Completed",
+                f"All metrics exported to:\n{output_folder}"
+            )
+        finally:
+            progress.hide()
     
     def initializePage(self):
         if self.wizard().group_analysis.get_experiments():
