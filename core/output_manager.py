@@ -150,9 +150,10 @@ class OutputManager:
                 df.to_csv(output_path, index_label="File Number")
     @staticmethod
     def save_all_peak_amplitudes(group_experiments : GroupAnalysis, output_folder_path):
-        keys = ['peak_amplitude_values']
+        keys = ['peak_amplitude_values', 'peak_amplitude_positions']
 
         experiments = group_experiments.get_experiments()
+        acq_freq = experiments[0].get_acquisition_frequency()
         n_experiments = len(experiments)
         n_files = experiments[0].get_file_count()
         n_before = experiments[0].get_number_of_files_before_treatment()
@@ -167,17 +168,26 @@ class OutputManager:
             time_points = [i * interval for i in range(n_files)]
 
         all_amplitudes = []
+        all_amplitude_pos = []
         for i, experiment in enumerate(group_experiments.get_experiments()):
-            records = []
+            records_amp = []
+            records_pos = []
             for j, spheroid_file in enumerate(experiment.files):
                 meta = spheroid_file.get_metadata()
                 # Save only selected keys
-                records.append(meta.get(keys[0], None) if keys else meta)
-            all_amplitudes.append(records)
+                records_amp.append(meta.get(keys[0], None) if keys else meta)
+                records_pos.append(meta.get(keys[1], None) if keys else meta)
+            all_amplitudes.append(records_amp)
+            all_amplitude_pos.append(records_pos)
         
         # Build DataFrame
-        df = pd.DataFrame(all_amplitudes).T  # shape: (n_files, n_experiments)
-        df.columns = [f"Rep{idx+1}" for idx in range(n_experiments)]
+        df_amp = pd.DataFrame(all_amplitudes).T  # shape: (n_files, n_experiments)
+        df_pos = pd.DataFrame(all_amplitude_pos).T / acq_freq
+
+        df_amp.columns = [f"Rep{idx+1}" for idx in range(n_experiments)]
+        df_pos.columns = [f"Rep{idx+1}" for idx in range(n_experiments)]
+
+        df = pd.concat({'Amplitude': df_amp, 'Position (s)': df_pos}, axis=1)
         df.insert(0, "Time", time_points)
 
         # Save to CSV
