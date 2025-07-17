@@ -271,15 +271,15 @@ class OutputManager:
                     "C_fit",   "C_SE",   "C_SD",   "C_CI95",
                     "t_half",  "t_half_SE", "t_half_SD", "t_half_CI95"])
         
-        df["Y0"] = df["A_fit"] + df["C_fit"]
-        df["Y0_SE"] = np.sqrt(df["A_SE"]**2 + df["C_SE"]**2)
-        df["Y0_SD"] = np.sqrt(df["A_SD"]**2 + df["C_SD"]**2)
-        df["Y0_CI95"] = np.sqrt(df["A_CI95"]**2 + df["C_CI95"]**2)
+        #df["Y0"] = df["A_fit"] + df["C_fit"]
+        #df["Y0_SE"] = np.sqrt(df["A_SE"]**2 + df["C_SE"]**2)
+        #df["Y0_SD"] = np.sqrt(df["A_SD"]**2 + df["C_SD"]**2)
+        #df["Y0_CI95"] = np.sqrt(df["A_CI95"]**2 + df["C_CI95"]**2)
         df.insert(0, "Time", time_points)
 
-        y0_cols = ["Y0", "Y0_SE", "Y0_SD", "Y0_CI95"]
-        new_order = ["Time"] + y0_cols + [c for c in df.columns if c not in (["Time"] + y0_cols)]
-        df = df[new_order]
+        #y0_cols = ["Y0", "Y0_SE", "Y0_SD", "Y0_CI95"]
+        #new_order = ["Time"] + y0_cols + [c for c in df.columns if c not in (["Time"] + y0_cols)]
+        #df = df[new_order]
 
         df["tau_fit"]    = df["tau_fit"]    / freq
         df["tau_SE"]     = df["tau_SE"]     / freq
