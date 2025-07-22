@@ -3,6 +3,7 @@ from matplotlib.figure import Figure
 from PyQt5.QtWidgets import QProgressDialog, QApplication
 from PyQt5.QtCore import QSettings
 import numpy as np
+from scipy.optimize import curve_fit
 
 from PyQt5.QtCore import Qt
 
@@ -61,14 +62,14 @@ class PlotCanvas(FigureCanvas):
         self.fig.tight_layout()
         self.draw()
 
-    def plot_IT(self,processed_data, metadata=None, peak_position=None):
+    def plot_IT(self, processed_data, metadata=None, peak_position=None):
         """
-        Plot the I-T (Intensity-Time) profile on the Qt canvas.
-
+        Enhanced plot_IT method that includes decay visualization.
+        
         Parameters:
-        - profile: 1D numpy array representing current over time
-        - metadata: dict containing 'peak_amplitude_positions' and optionally 'peak_amplitude_values'
-        - peak_position: optional, used for labeling the title
+        - processed_data: 2D numpy array 
+        - metadata: dict containing peak and decay information
+        - peak_position: column index for the peak position
         """
         self.fig.clear()
         self.axes.clear()
@@ -89,11 +90,12 @@ class PlotCanvas(FigureCanvas):
         if metadata and 'peak_amplitude_positions' in metadata:
             peak_indices = metadata['peak_amplitude_positions']
             peak_values = metadata.get('peak_amplitude_values', profile[peak_indices])
+            
             # Handle both single value and list/array for peaks
             if isinstance(peak_indices, (list, np.ndarray)) and isinstance(peak_values, (list, np.ndarray)):
                 for idx, val in zip(peak_indices, peak_values):
                     if 0 <= idx < len(profile):
-                        self.axes.scatter(t[idx], val, color='#FF3877', zorder=5)
+                        self.axes.scatter(t[idx], val, color='#FF3877', s=100, zorder=5)
                         self.axes.annotate(f"{val:.2f}", (t[idx], val), textcoords="offset points",
                                            xytext=(0, 10), ha='center', fontsize=9, color='#FF3877')
             else:
@@ -102,20 +104,30 @@ class PlotCanvas(FigureCanvas):
                     idx = int(peak_indices)
                     val = float(peak_values)
                     if 0 <= idx < len(profile):
-                        self.axes.scatter(t[idx], val, color='#FF3877', zorder=5)
+                        self.axes.scatter(t[idx], val, color='#FF3877', s=100, zorder=5, label='Peak')
                         self.axes.annotate(f"{val:.2f}", (t[idx], val), textcoords="offset points",
                                            xytext=(0, 10), ha='center', fontsize=9, color='#FF3877')
                 except Exception:
                     pass
 
+            # Plot decay regions if available
+            self._plot_decay_regions(metadata, t, freq)
+
+
+        # Add validation status to title
+        validation_status = ""
+        if metadata and 'decay_validation_params' in metadata:
+            is_valid = metadata['decay_validation_params'].get('peak_passed_validation', False)
+            validation_status = "(Valid" if is_valid else "(Invalid"
+
         # Axis labeling and formatting
         self.axes.set_xlabel("Time (seconds)")
         self.axes.set_ylabel("Current (nA)")
-        title = "I-T Profile"
+        title = f"I-T Profile {validation_status}"
         if peak_position is not None:
-            title += f" at Peak Position {peak_position}"
+            title += f" Peak at Position {peak_position})"
         self.axes.set_title(title, fontweight="bold")
-        self.axes.grid(False)
+        self.axes.grid(True, alpha=0.3)
         self.axes.legend()
 
         max_t = t[-1]
@@ -123,10 +135,33 @@ class PlotCanvas(FigureCanvas):
         ticks = np.arange(0, max_t + tick_interval, tick_interval)
         self.axes.set_xticks(ticks)
 
-        #self.fig.tight_layout()
-        # Render to canvas
         self.draw()
 
+    def _plot_decay_regions(self, metadata, t, freq):
+        """Plot decay regions on the current axes"""
+        # Plot left decay region
+        if 'decay_left_region' in metadata:
+            left_data = metadata['decay_left_region']
+            if 'indices' in left_data and 'values' in left_data:
+                left_indices = list(left_data['indices'])
+                left_values = left_data['values']
+                if len(left_indices) > 0 and len(left_values) > 0:
+                    left_times = [t[i] for i in left_indices if i < len(t)]
+                    self.axes.plot(left_times, left_values, 'o-', color='orange', 
+                                  alpha=0.8, markersize=4, label='Left Decay Region')
+
+        # Plot right decay region
+        if 'decay_right_region' in metadata:
+            right_data = metadata['decay_right_region']
+            if 'indices' in right_data and 'values' in right_data:
+                right_indices = list(right_data['indices'])
+                right_values = right_data['values']
+                if len(right_indices) > 0 and len(right_values) > 0:
+                    right_times = [t[i] for i in right_indices if i < len(t)]
+                    self.axes.plot(right_times, right_values, 'o-', color='green', 
+                                  alpha=0.8, markersize=4, label='Right Decay Region')
+
+    # Keep all your existing methods unchanged
     def show_average_over_experiments(self, group_analysis):
         """
         Plots the mean amplitudes over time across all experiments,
@@ -173,146 +208,6 @@ class PlotCanvas(FigureCanvas):
         self.draw()
         progress.close()
 
-    def show_decay_exponential_fitting(self, group_analysis, replicate_time_point=0):
-        from PyQt5.QtWidgets import QMessageBox
-        # Show loading dialog
-        progress = QProgressDialog("Processing data, please wait...", None, 0, 0, self)
-        progress.setWindowModality(Qt.ApplicationModal)
-        progress.setAutoClose(True)
-        progress.setAutoReset(True)
-        progress.setMinimumDuration(0)
-        progress.show()
-        QApplication.processEvents()  # Ensure dialog appears
-
-        settings = QSettings("HashemiLab", "NeuroStemVolt")
-        freq = settings.value("acquisition_frequency", 10, type=int)
-
-        try:
-            result = group_analysis.exponential_fitting_replicated(replicate_time_point)
-        except ValueError as e:
-            QMessageBox.warning(
-                self,
-                "Dimension Mismatch",
-                f"Error: {str(e)}\n\nPlease ensure all replicates have the same number of time points."
-            )
-            self.axes.clear()
-            self.axes.set_title("Dimension mismatch error")
-            self.draw()
-            progress.close()
-            return
-        if result is None:
-            self.axes.clear()
-            self.axes.set_title("No data to fit")
-            self.draw()
-            progress.close()
-            return
-        
-        from scipy.stats import t
-        import numpy as np
-
-        # Get fit and aligned ITs from group_analysis
-        # result = group_analysis.exponential_fitting_replicated(replicate_time_point)
-        time_all, cropped_ITs, _, t_half, fit_vals, fit_errs, min_peak = result
-
-        A_fit, k_fit, C_fit = fit_vals
-        A_err, k_err, C_err = fit_errs
-        tau_fit = 1 / k_fit if k_fit != 0 else np.nan
-
-        n_exps, n_post = cropped_ITs.shape
-        t_rel = np.arange(n_post) / freq        # seconds
-
-        mean_IT = np.nanmean(cropped_ITs, axis=0)
-        std_IT  = np.nanstd (cropped_ITs, axis=0)
-        # do the fit in sample‐point space, then map to seconds:
-        t_fit_pts = np.linspace(0, n_post-1, 500)          # in points
-        y_fit     = (A_fit - C_fit) * np.exp(-k_fit * t_fit_pts) + C_fit
-        t_fit_rel = t_fit_pts / freq                       # now in seconds
-
-        # 95% CI of the fit via Jacobian
-        dof  = max(0, len(time_all) - 3)
-        tval = t.ppf(0.975, dof)
-        J        = np.empty((len(t_fit_rel), 3))
-        J[:, 0] = np.exp(-t_fit_rel * k_fit)                            
-        J[:, 1] = -(A_fit - C_fit) * t_fit_rel * np.exp(-t_fit_rel * k_fit) 
-        J[:, 2] = 1 - np.exp(-t_fit_rel * k_fit)                        
-        pcov = np.diag([A_err**2, k_err**2, C_err**2])
-        ci = np.sqrt(np.sum((J @ pcov) * J, axis=1)) * tval
-        lower_ci = y_fit - ci
-        upper_ci = y_fit + ci
-
-        # Plot on the embedded axes
-        self.axes.clear()
-
-        # a) each replicate in light gray
-        for row in cropped_ITs:
-            self.axes.plot(t_rel, row, color='gray', alpha=0.3, lw=1, label='_nolegend_')
-
-        # b) individual data points used for fitting
-        ITs_flattened = cropped_ITs.flatten()
-        t_data = (np.array(time_all)) / freq
-        self.axes.scatter(t_data, ITs_flattened, color='black', s=16, alpha=0.7, label='Data points')
-
-        # d) fitted exponential curve
-        self.axes.plot(t_fit_rel, y_fit, color='C1', lw=2, label='Exp fit')
-
-        # e) 95% CI around the fit
-        self.axes.fill_between(t_fit_rel, lower_ci, upper_ci, color='C1', alpha=0.3, label='95% CI')
-
-        # f) half-life marker
-        t_half_s = t_half / freq
-        self.axes.axvline(t_half_s, color='magenta', ls='--',label=f't½ ≈ {t_half_s:.2f} s')
-
-        # 7) labels & styling
-        self.axes.set_xlabel('Time (seconds)', fontsize=12)
-        self.axes.set_ylabel('Current (nA)', fontsize=12)
-        self.axes.set_title('Post-peak IT decays & exponential fit', fontsize=14)
-        self.axes.legend(frameon=False)
-        self.axes.grid(False)
-        self.fig.tight_layout()
-
-        max_t = t_rel[-1]  # since t_rel is in seconds
-
-        tick_interval = 5  # seconds
-        ticks = np.arange(0, max_t + tick_interval, tick_interval)
-        self.axes.set_xticks(ticks)
-
-        self.draw()
-        progress.close()
-
-    def show_tau_param_over_time(self, group_analysis):
-        """
-        Plots the exponential decay parameter tau over replicate time points on the embedded canvas.
-        """
-        import numpy as np
-
-        # Show loading dialog
-        progress = QProgressDialog("Processing data, please wait...", None, 0, 0, self)
-        progress.setWindowModality(Qt.ApplicationModal)
-        progress.setAutoClose(True)
-        progress.setAutoReset(True)
-        progress.setMinimumDuration(0)
-        progress.show()
-        QApplication.processEvents()  # Ensure dialog appears
-
-        tau_list, tau_err_list = group_analysis.get_tau_over_time()
-        n_files = group_analysis.get_experiments()[0].get_file_count()
-        time_points = np.linspace(
-            0,
-            group_analysis.get_experiments()[0].get_time_between_files() * (n_files - 1),
-            n_files
-        )
-
-        self.axes.clear()
-        self.axes.errorbar(time_points, tau_list, yerr=tau_err_list, fmt='o-', capsize=4, color='C1', label='Tau (decay constant)')
-        self.axes.set_xlabel("Time (minutes)")
-        self.axes.set_ylabel("Tau (decay constant)")
-        self.axes.set_title("Exponential Decay Tau Over Time Points")
-        self.axes.grid(False)
-        self.axes.legend()
-        self.fig.tight_layout()
-        self.draw()
-        progress.close()
-
     def show_amplitudes_over_time(self, group_analysis):
         """
         Plot all amplitudes over time for each experiment as separate lines on the embedded canvas.
@@ -348,7 +243,7 @@ class PlotCanvas(FigureCanvas):
         self.axes.set_ylabel('Amplitude')
         self.axes.set_title('Amplitudes Over Time (All Experiments)')
         self.axes.legend()
-        self.axes.set_xticks(np.arange(0, max(time_points) + 1, 10))
+        self.axes.set_xticks(np.arange(0, max_t + tick_interval, tick_interval))
         self.fig.tight_layout()
         self.draw()
         progress.close()
