@@ -129,7 +129,7 @@ class PlotCanvas(FigureCanvas):
         if peak_position is not None:
             title += f" Peak at Position {peak_position})"
         self.axes.set_title(title, fontweight="bold")
-        self.axes.grid(True, alpha=0.3)
+        self.axes.grid(False, alpha=0.3)
         self.axes.legend()
 
         max_t = t[-1]
