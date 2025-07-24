@@ -22,16 +22,25 @@ class ButterworthFilter(Processor):
     def process(self, data):
         rows, cols = data.shape
 
+        # Amount of padding — you can tweak this
+        pad_y = int(0.1 * rows)   # 10% vertical padding
+        pad_x = int(0.1 * cols)   # 10% horizontal padding
+
+        # Apply reflect padding and store it
+        padded_data = np.pad(data, ((pad_y, pad_y), (pad_x, pad_x)), mode='reflect')
+
         # 1. Perform 2D FFT and shift the zero frequency to the center
-        F = np.fft.fft2(data)
+        F = np.fft.fft2(padded_data)
         F_shifted = np.fft.fftshift(F)
 
         fs_x = 10  # Acquisition frequency in x direction
         fs_y = 500000 # Update rate in y direction
 
+        padded_rows, padded_cols = padded_data.shape
+
         # 2. Frequency vectors in Hz
-        fx = np.fft.fftfreq(cols, d=1/fs_x)  # shape: (1100,)
-        fy = np.fft.fftfreq(rows, d=1/fs_y)  # shape: (150,)
+        fx = np.fft.fftfreq(padded_cols, d=1/fs_x)
+        fy = np.fft.fftfreq(padded_rows, d=1/fs_y) 
 
         wx = np.fft.fftshift(fx)
         wy = np.fft.fftshift(fy)
@@ -52,9 +61,12 @@ class ButterworthFilter(Processor):
         # 6. Inverse FFT to return to spatial domain
         filtered = np.fft.ifft2(np.fft.ifftshift(F_filtered)).real
 
+        # 7. Crop to original size (remove padding)
+        filtered_cropped = filtered[pad_y:-pad_y, pad_x:-pad_x]
+
         #self.visualize_cutoff(data)
 
-        return filtered
+        return filtered_cropped
     
     def visualize_cutoff(self, data):
         """
