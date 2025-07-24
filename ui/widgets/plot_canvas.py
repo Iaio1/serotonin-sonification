@@ -109,16 +109,18 @@ class PlotCanvas(FigureCanvas):
                                            xytext=(0, 10), ha='center', fontsize=9, color='#FF3877')
                 except Exception:
                     pass
-
-            # Plot decay regions if available
-            self._plot_decay_regions(metadata, t, freq)
+            if metadata and 'decay_validation_params' in metadata:
+                if metadata['decay_validation_params'] is not None:
+                    # Plot decay regions if available
+                    self._plot_decay_regions(metadata, t, freq)
 
 
         # Add validation status to title
         validation_status = ""
         if metadata and 'decay_validation_params' in metadata:
-            is_valid = metadata['decay_validation_params'].get('peak_passed_validation', False)
-            validation_status = "(Valid" if is_valid else "(Invalid"
+            if metadata['decay_validation_params'] is not None:
+                is_valid = metadata['decay_validation_params'].get('peak_passed_validation', False)
+                validation_status = "(Valid" if is_valid else "(Invalid"
 
         # Axis labeling and formatting
         self.axes.set_xlabel("Time (seconds)")
@@ -208,6 +210,146 @@ class PlotCanvas(FigureCanvas):
         self.draw()
         progress.close()
 
+    def show_decay_exponential_fitting(self, group_analysis, replicate_time_point=0):
+        from PyQt5.QtWidgets import QMessageBox
+        # Show loading dialog
+        progress = QProgressDialog("Processing data, please wait...", None, 0, 0, self)
+        progress.setWindowModality(Qt.ApplicationModal)
+        progress.setAutoClose(True)
+        progress.setAutoReset(True)
+        progress.setMinimumDuration(0)
+        progress.show()
+        QApplication.processEvents()  # Ensure dialog appears
+
+        settings = QSettings("HashemiLab", "NeuroStemVolt")
+        freq = settings.value("acquisition_frequency", 10, type=int)
+
+        try:
+            result = group_analysis.exponential_fitting_replicated(replicate_time_point)
+        except ValueError as e:
+            QMessageBox.warning(
+                self,
+                "Dimension Mismatch",
+                f"Error: {str(e)}\n\nPlease ensure all replicates have the same number of time points."
+            )
+            self.axes.clear()
+            self.axes.set_title("Dimension mismatch error")
+            self.draw()
+            progress.close()
+            return
+        if result is None:
+            self.axes.clear()
+            self.axes.set_title("No data to fit")
+            self.draw()
+            progress.close()
+            return
+
+        from scipy.stats import t
+        import numpy as np
+
+        # Get fit and aligned ITs from group_analysis
+        # result = group_analysis.exponential_fitting_replicated(replicate_time_point)
+        time_all, cropped_ITs, _, t_half, fit_vals, fit_errs, min_peak = result
+
+        A_fit, k_fit, C_fit = fit_vals
+        A_err, k_err, C_err = fit_errs
+        tau_fit = 1 / k_fit if k_fit != 0 else np.nan
+
+        n_exps, n_post = cropped_ITs.shape
+        t_rel = np.arange(n_post) / freq        # seconds
+
+        mean_IT = np.nanmean(cropped_ITs, axis=0)
+        std_IT  = np.nanstd (cropped_ITs, axis=0)
+        # do the fit in sample‐point space, then map to seconds:
+        t_fit_pts = np.linspace(0, n_post-1, 500)          # in points
+        y_fit     = (A_fit - C_fit) * np.exp(-k_fit * t_fit_pts) + C_fit
+        t_fit_rel = t_fit_pts / freq                       # now in seconds
+
+        # 95% CI of the fit via Jacobian
+        dof  = max(0, len(time_all) - 3)
+        tval = t.ppf(0.975, dof)
+        J        = np.empty((len(t_fit_rel), 3))
+        J[:, 0] = np.exp(-t_fit_rel * k_fit)                            
+        J[:, 1] = -(A_fit - C_fit) * t_fit_rel * np.exp(-t_fit_rel * k_fit) 
+        J[:, 2] = 1 - np.exp(-t_fit_rel * k_fit)                        
+        pcov = np.diag([A_err**2, k_err**2, C_err**2])
+        ci = np.sqrt(np.sum((J @ pcov) * J, axis=1)) * tval
+        lower_ci = y_fit - ci
+        upper_ci = y_fit + ci
+
+        # Plot on the embedded axes
+        self.axes.clear()
+
+        # a) each replicate in light gray
+        for row in cropped_ITs:
+            self.axes.plot(t_rel, row, color='gray', alpha=0.3, lw=1, label='_nolegend_')
+
+        # b) individual data points used for fitting
+        ITs_flattened = cropped_ITs.flatten()
+        t_data = (np.array(time_all)) / freq
+        self.axes.scatter(t_data, ITs_flattened, color='black', s=16, alpha=0.7, label='Data points')
+
+        # d) fitted exponential curve
+        self.axes.plot(t_fit_rel, y_fit, color='C1', lw=2, label='Exp fit')
+
+        # e) 95% CI around the fit
+        self.axes.fill_between(t_fit_rel, lower_ci, upper_ci, color='C1', alpha=0.3, label='95% CI')
+
+        # f) half-life marker
+        t_half_s = t_half / freq
+        self.axes.axvline(t_half_s, color='magenta', ls='--',label=f't½ ≈ {t_half_s:.2f} s')
+
+        # 7) labels & styling
+        self.axes.set_xlabel('Time (seconds)', fontsize=12)
+        self.axes.set_ylabel('Current (nA)', fontsize=12)
+        self.axes.set_title('Post-peak IT decays & exponential fit', fontsize=14)
+        self.axes.legend(frameon=False)
+        self.axes.grid(False)
+        self.fig.tight_layout()
+
+        max_t = t_rel[-1]  # since t_rel is in seconds
+
+        tick_interval = 5  # seconds
+        ticks = np.arange(0, max_t + tick_interval, tick_interval)
+        self.axes.set_xticks(ticks)
+
+        self.draw()
+        progress.close()
+
+    def show_tau_param_over_time(self, group_analysis):
+        """
+        Plots the exponential decay parameter tau over replicate time points on the embedded canvas.
+        """
+        import numpy as np
+
+        # Show loading dialog
+        progress = QProgressDialog("Processing data, please wait...", None, 0, 0, self)
+        progress.setWindowModality(Qt.ApplicationModal)
+        progress.setAutoClose(True)
+        progress.setAutoReset(True)
+        progress.setMinimumDuration(0)
+        progress.show()
+        QApplication.processEvents()  # Ensure dialog appears
+
+        tau_list, tau_err_list = group_analysis.get_tau_over_time()
+        n_files = group_analysis.get_experiments()[0].get_file_count()
+        time_points = np.linspace(
+            0,
+            group_analysis.get_experiments()[0].get_time_between_files() * (n_files - 1),
+            n_files
+        )
+
+        self.axes.clear()
+        self.axes.errorbar(time_points, tau_list, yerr=tau_err_list, fmt='o-', capsize=4, color='C1', label='Tau (decay constant)')
+        self.axes.set_xlabel("Time (minutes)")
+        self.axes.set_ylabel("Tau (decay constant)")
+        self.axes.set_title("Exponential Decay Tau Over Time Points")
+        self.axes.grid(False)
+        self.axes.legend()
+        self.fig.tight_layout()
+        self.draw()
+        progress.close()
+
     def show_amplitudes_over_time(self, group_analysis):
         """
         Plot all amplitudes over time for each experiment as separate lines on the embedded canvas.
@@ -243,6 +385,8 @@ class PlotCanvas(FigureCanvas):
         self.axes.set_ylabel('Amplitude')
         self.axes.set_title('Amplitudes Over Time (All Experiments)')
         self.axes.legend()
+        max_t = time_points[-1]
+        tick_interval = 5
         self.axes.set_xticks(np.arange(0, max_t + tick_interval, tick_interval))
         self.fig.tight_layout()
         self.draw()
