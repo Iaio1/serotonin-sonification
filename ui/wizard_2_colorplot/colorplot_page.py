@@ -16,6 +16,22 @@ import numpy as np
 import os
 
 class ColorPlotPage(QWizardPage):
+    """
+    Wizard page for visualizing and processing color plot data from FSCV experiments.
+
+    This page provides a user interface for:
+    - Navigating between replicates and files.
+    - Applying signal processing steps to data.
+    - Visualizing processed data as color plots and I-T curves.
+    - Saving or exporting results and visualizations.
+
+    Attributes:
+        selected_processors (list): List of user-selected processing steps.
+        current_rep_index (int): Currently selected replicate index.
+        current_file_index (int): Currently selected file index.
+        main_plot (PlotCanvas): Canvas for rendering 2D color plots.
+        it_plot (PlotCanvas): Canvas for rendering I-T profiles.
+    """
     def __init__(self, parent=None):
         super().__init__(parent)
         #self.setTitle("Color Plot")
@@ -123,6 +139,12 @@ class ColorPlotPage(QWizardPage):
         self.setLayout(main_layout)
     
     def initializePage(self):
+        """
+        Initializes the page when it becomes visible.
+
+        Loads the list of replicates and associated files into combo boxes.
+        Enables/disables UI components depending on available data.
+        """
         # Default index
         def_index = 0
 
@@ -148,6 +170,14 @@ class ColorPlotPage(QWizardPage):
             self.update_file_display()
 
     def clear_all(self):
+        """
+        Clears all replicate and file selections and resets the plots.
+
+        This method:
+        - Resets internal indices to zero.
+        - Clears both replicate and file combo boxes.
+        - Clears the color plot and I-T canvas visuals.
+        """
         # reset indices
         self.current_rep_index = 0
         self.current_file_index = 0
@@ -162,15 +192,35 @@ class ColorPlotPage(QWizardPage):
             canvas.draw()
 
     def on_replicate_changed(self, index):
+        """
+        Handles replicate selection changes.
+
+        Args:
+            index (int): Index of the newly selected replicate.
+
+        This updates the file combo box and visualizations accordingly.
+        """
         self.current_rep_index = index
         self.current_file_index = 0
         self.update_file_display()
 
     def on_file_changed(self, index):
+        """
+        Handles file selection changes within a replicate.
+
+        Args:
+            index (int): Index of the newly selected file.
+        """
         self.current_file_index = index
         self.update_file_display()
 
     def update_file_display(self):
+        """
+        Loads and displays the selected file's data.
+
+        Updates both the color plot and I-T profile based on the
+        current replicate and file selection. Handles out-of-bounds errors.
+        """
         group_analysis = self.wizard().group_analysis
         try:
             exp = group_analysis.get_single_experiments(self.current_rep_index)
@@ -188,17 +238,30 @@ class ColorPlotPage(QWizardPage):
             self.cbo_file.setCurrentText("No file at this index")
 
     def on_next_clicked(self):
+        """
+        Advances to the next file in the current replicate, if available.
+        """
         exp = self.wizard().group_analysis.get_single_experiments(self.current_rep_index)
         if self.current_file_index < exp.get_file_count() - 1:
             self.current_file_index += 1
             self.cbo_file.setCurrentIndex(self.current_file_index)
 
     def on_prev_clicked(self):
+        """
+        Moves to the previous file in the current replicate, if available.
+        """
         if self.current_file_index > 0:
             self.current_file_index -= 1
             self.cbo_file.setCurrentIndex(self.current_file_index)
 
     def run_processing(self):
+        """
+        Runs the selected processing pipeline on the current experiment group.
+
+        Automatically adds `FindAmplitude` as a mandatory step.
+        Displays a progress dialog while processing.
+        Updates visualizations after processing is complete.
+        """
         group_analysis = self.wizard().group_analysis
         peak_pos = QSettings("HashemiLab", "NeuroStemVolt").value("peak_position", type=int)
 
@@ -234,6 +297,11 @@ class ColorPlotPage(QWizardPage):
         self.update_file_display()
 
     def show_processing_options(self):
+        """
+        Opens the processing options dialog and updates selected processors.
+
+        Retrieves the user’s choices and instantiates corresponding Processor objects.
+        """
         dlg = ProcessingOptionsDialog(self)
         if dlg.exec_() == QDialog.Accepted:
             selected_names = dlg.get_selected_processors()
@@ -245,6 +313,15 @@ class ColorPlotPage(QWizardPage):
             ]
 
     def validatePage(self):
+        """
+        Validates this wizard page before proceeding.
+
+        Applies `FindAmplitude` processing to ensure peak information is available
+        for subsequent pages.
+
+        Returns:
+            bool: True if validation is successful, allowing transition to next page.
+        """
         # Automatically add FindAmplitude processor and run it before proceeding
         group_analysis = self.wizard().group_analysis
         peak_pos = QSettings("HashemiLab", "NeuroStemVolt").value("peak_position", type=int)
@@ -258,11 +335,17 @@ class ColorPlotPage(QWizardPage):
         return True  # allow transition to next page
 
     def save_all_ITs(self):
+        """
+        Saves all I-T profiles from all experiments to the specified output folder.
+        """
         group_analysis = self.wizard().group_analysis
         output_folder_path = QSettings("HashemiLab", "NeuroStemVolt").value("output_folder")
         OutputManager.save_all_ITs(group_analysis, output_folder_path)
 
     def save_IT_ColorPlot_Plots(self):
+        """
+        Saves the color plot and I-T profile visualizations for the current file.
+        """
         exp = self.wizard().group_analysis.get_single_experiments(self.current_rep_index)
         sph_file = exp.get_spheroid_file(self.current_file_index)
         output_folder_path = QSettings("HashemiLab", "NeuroStemVolt").value("output_folder")
@@ -270,6 +353,9 @@ class ColorPlotPage(QWizardPage):
         sph_file.visualize_IT_profile(QSettings("HashemiLab", "NeuroStemVolt").value("output_folder"))
 
     def save_processed_data_IT(self):
+        """
+        Saves the processed I-T data array (not a figure) for the current file.
+        """
         exp = self.wizard().group_analysis.get_single_experiments(self.current_rep_index)
         sph_file = exp.get_spheroid_file(self.current_file_index)
         output_folder_path = QSettings("HashemiLab", "NeuroStemVolt").value("output_folder")
