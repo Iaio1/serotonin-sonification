@@ -58,7 +58,7 @@ class SpheroidExperiment:
             self.waveform = waveform
 
         self.acquisition_frequency = acquisition_frequency
-        check_uniform_step_timepoints(filepaths)
+        check_uniform_step_timepoints(sorted(filepaths, key=extract_timepoint))
         self.files = [SpheroidFile(fp,  self.acquisition_frequency, self.waveform) for fp in sorted(filepaths, key=extract_timepoint)]
         self.file_length = file_length
         self.peak_position = peak_position
