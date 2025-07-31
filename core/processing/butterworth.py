@@ -6,20 +6,30 @@ from matplotlib.patches import Ellipse
 class ButterworthFilter(Processor):
     def __init__(self, p=4, fs_x=10, fs_y=500000):
         """
-        Usage:
-        This processor applies a 2D Butterworth filter to the input data.
-        Inputs:
-        - cx, cy: cutoff frequencies in normalized units (0 to 0.5)
-        - p: filter order, default is 4
-        Outputs:
-        - filtered: 2D numpy array with the Butterworth filter applied
-        Note: The cutoff frequencies are set to 15% of the Nyquist frequency for the x and y axes.
-        The implementation is inspired by the paper Novel, User-Friendly Experimental and Analysis Strategies for Fast Voltammetry: 1. The Analysis Kid for FSCV by Mena et al. (2021) 
+        Apply a 2D low-pass Butterworth filter to FSCV color plot data. The implementation is inspired by the paper Novel, User-Friendly Experimental and Analysis Strategies for Fast Voltammetry: 1. The Analysis Kid for FSCV by Mena et al. (2021) 
         https://doi.org/10.1021/acs.analchem.1c01258
+
+        Args:
+            p (int): Filter order.
+            fs_x (int): Sampling rate in time direction.
+            fs_y (int): Sampling rate in voltage direction.
+
+        Methods:
+            process(data): Returns filtered data.
+            visualize_cutoff(data): Shows cutoff region on FFT spectrum.
         """
         self.p = p
 
     def process(self, data):
+        """
+        Apply a 2D Butterworth filter to the input data.
+
+        Args:
+            data (np.ndarray): 2D FSCV data array.
+
+        Returns:
+            np.ndarray: Filtered 2D data.
+        """
         rows, cols = data.shape
 
         # Amount of padding — you can tweak this
