@@ -3,6 +3,7 @@ from core.group_analysis import GroupAnalysis
 import os
 import pandas as pd
 import numpy as np
+from scipy.stats import sem
 
 class OutputManager:
     @staticmethod
@@ -148,6 +149,7 @@ class OutputManager:
                     os.mkdir(output_IT_folder)
                 output_path = os.path.join(output_IT_folder, output_csv)
                 df.to_csv(output_path, index_label="File Number")
+
     @staticmethod
     def save_all_peak_amplitudes(group_experiments : GroupAnalysis, output_folder_path):
         keys = ['peak_amplitude_values', 'peak_amplitude_positions']
@@ -196,6 +198,51 @@ class OutputManager:
         output_path = os.path.join(output_folder, "All_amplitudes_all_replicates.csv")
         df.to_csv(output_path, index=False)
         print(f"Saved all amplitudes for all replicates to {output_path}")
+
+    def save_all_AUC(group_experiments:GroupAnalysis, output_folder_path):
+
+        experiments = group_experiments.get_experiments()
+        n_experiments = len(experiments)
+        n_files = experiments[0].get_file_count()
+        n_before = experiments[0].get_number_of_files_before_treatment()
+        interval = experiments[0].get_time_between_files()  # e.g., 10
+
+        if n_experiments == 0:
+            return None
+        # Initialise the time axis (first column)
+        if n_before > 0:
+            time_points = [interval * (i - n_before) for i in range(n_files)]
+        else:
+            time_points = [i * interval for i in range(n_files)]
+
+        all_AUC = group_experiments.get_all_AUC()
+        df_AUC = pd.DataFrame(all_AUC).T
+
+        df_AUC.columns = [f"Rep{idx+1}" for idx in range(n_experiments)]
+        df_AUC.insert(0, "Time", time_points)
+
+        # Save to CSV
+        output_folder = os.path.join(output_folder_path, "all_replicates_AUC")
+        os.makedirs(output_folder, exist_ok=True)
+        output_path = os.path.join(output_folder, "All_AUC_all_replicates.csv")
+        df_AUC.to_csv(output_path, index=False)
+        print(f"Saved all amplitudes for all replicates to {output_path}")
+
+        # Compute mean and SEM (standard error of the mean)
+        values_only = df_AUC.iloc[:, 1:].to_numpy()  # exclude "Time" column
+        mean_auc = np.nanmean(values_only, axis=1)
+        sem_auc = sem(values_only, axis=1, nan_policy='omit')
+
+        df_mean_sem = pd.DataFrame({
+            "Time": time_points,
+            "Mean AUC": mean_auc,
+            "SEM AUC": sem_auc
+        })
+
+        # Save mean and SEM
+        mean_output_path = os.path.join(output_folder, "Mean_AUC_with_SEM.csv")
+        df_mean_sem.to_csv(mean_output_path, index=False)
+        print(f"Saved mean AUC with SEM to {mean_output_path}")
 
     @staticmethod
     def save_all_reuptake_curves(group_experiments : GroupAnalysis, output_folder_path):

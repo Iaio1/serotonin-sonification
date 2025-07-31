@@ -125,7 +125,7 @@ class GroupAnalysis:
             
         print(pre_allocated_ITs_array)
         return pre_allocated_ITs_array
-    
+
     def average_IT_over_replicates(self):
         """
         This method gets the IT profiles of all experiments of all files
@@ -250,6 +250,40 @@ class GroupAnalysis:
         mean_amplitudes = np.nanmean(all_amplitudes, axis=0)
         return time_points, mean_amplitudes, all_amplitudes, files_before_treatment
     
+    def get_all_AUC(self):
+        from scipy.integrate import simpson
+
+        n_experiments = len(self.experiments)
+        if n_experiments == 0:
+            return None, None, None, None
+        
+        all_AUC = []
+        for i, experiment in enumerate(self.experiments):
+            records_AUC = []
+            for j, spheroid_file in enumerate(experiment.files):
+                # Gathering position of peak
+                metadata = spheroid_file.get_metadata()
+                peak_amplitude_pos = metadata['peak_amplitude_positions']
+                # Gathering processed data
+                processed_IT = spheroid_file.get_processed_data_IT()
+                # Cropping IT to find first intersect after peak
+                IT_cropped = processed_IT[peak_amplitude_pos:]
+                zero_indices = np.where(IT_cropped == 0)[0]
+                if zero_indices.size > 0:
+                    mapped_intersect = zero_indices[0] + peak_amplitude_pos
+                else:
+                    min_amp_index = np.argmin(IT_cropped)
+                    mapped_intersect = min_amp_index + peak_amplitude_pos
+                # Just in case there is a very short range
+                if mapped_intersect <= 1:
+                    res_AUC = 0 
+                else:
+                    res_AUC = simpson(processed_IT[:mapped_intersect + 1])
+
+                records_AUC.append(res_AUC)
+            all_AUC.append(records_AUC)
+        return all_AUC
+
     def exponential_fitting_replicated(self, replicate_time_point=0, global_peak_amplitude_position=None):
         from scipy.optimize import curve_fit
         n_experiments = len(self.experiments)
@@ -912,6 +946,66 @@ class GroupAnalysis:
         else:
             plt.show()
 
+    def plot_AUC(self, experiment_index=0, file_index=0, save_path=None):
+        """
+        Plots the processed IT trace for a given experiment and file index,
+        highlights the region used for AUC calculation, and annotates the AUC value.
+        """
+        import matplotlib.pyplot as plt
+        import numpy as np
+        from scipy.integrate import simpson
+
+        # Extract data for the specified experiment and file
+        experiment = self.experiments[experiment_index]
+        spheroid_file = experiment.get_spheroid_file(file_index)
+        processed_IT = spheroid_file.get_processed_data_IT()
+        metadata = spheroid_file.get_metadata()
+        peak_pos = metadata['peak_amplitude_positions']
+
+        # Identify the first zero-crossing after the peak
+        cropped_IT = processed_IT[peak_pos:]
+        zero_indices = np.where(cropped_IT == 0)[0]
+        if zero_indices.size > 0:
+            first_zero = zero_indices[0] + peak_pos
+        else:
+            first_zero = len(processed_IT)
+
+        # Calculate the area under the curve up to the first zero-crossing
+        auc_value = simpson(processed_IT[:first_zero])
+
+        # Prepare the plot
+        x = np.arange(len(processed_IT))
+        fig, ax = plt.subplots(figsize=(8, 6))
+        ax.plot(x, processed_IT, label='Processed IT')
+        ax.fill_between(x[:first_zero], processed_IT[:first_zero], color='C1', alpha=0.3, label='AUC region')
+        ax.set_xlabel('Time Points')
+        ax.set_ylabel('Current (nA)')
+        ax.set_title('AUC Calculation')
+
+        # Annotate the AUC value on the plot
+        text_x = 0.05 * len(processed_IT)
+        text_y = np.max(processed_IT) * 0.9
+        ax.text(
+            text_x,
+            text_y,
+            f'AUC = {auc_value:.2f}',
+            fontsize=12,
+            color='black',
+            bbox=dict(facecolor='white', alpha=0.6)
+        )
+        ax.legend(frameon=False)
+        fig.tight_layout()
+
+        # Save or show the figure
+        if save_path:
+            fig.savefig(save_path, dpi=300, bbox_inches='tight')
+            plt.close(fig)
+        else:
+            plt.show()
+
+        # 7) Return the figure, axis, and calculated AUC in case further processing is desired
+        return fig, ax, auc_value
+
 if __name__ == "__main__":
     import time
     start_time = time.time()
@@ -947,7 +1041,8 @@ if __name__ == "__main__":
     print("--- %s seconds ---" % (time.time() - start_time))
 
     #group_analysis.plot_mean_ITs()
-    group_analysis.exponential_fitting_replicated()
+    group_analysis.plot_AUC()
+    #group_analysis.exponential_fitting_replicated()
     #group_analysis.plot_exponential_fit_aligned(replicate_time_point=0)
     #group_analysis.plot_unprocessed_first_ITs()
     #group_analysis.plot_mean_amplitudes_over_time()
@@ -955,5 +1050,5 @@ if __name__ == "__main__":
     #group_analysis.amplitudes_first_stim()
     #group_analysis.plot_first_stim_amplitudes()
     #group_analysis.plot_tau_over_time()
-    group_analysis.get_all_reuptake_curves()
-    params_matrix = group_analysis.get_exponential_fit_params_over_time()
+    #group_analysis.get_all_reuptake_curves()
+    #params_matrix = group_analysis.get_exponential_fit_params_over_time()
