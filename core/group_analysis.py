@@ -256,6 +256,57 @@ class GroupAnalysis:
         n_experiments = len(self.experiments)
         if n_experiments == 0:
             return None, None, None, None
+        exp = self.experiments[0]
+        acq_freq = exp.get_acquisition_frequency()
+        
+        if exp.stim_params.get("start") == None:
+            start = 0
+        else:  
+            start = int(exp.stim_params.get("start"))
+            start = acq_freq * start
+
+        all_AUC = []
+        for i, experiment in enumerate(self.experiments):
+            records_AUC = []
+            for j, spheroid_file in enumerate(experiment.files):
+                # Gathering position of peak
+                metadata = spheroid_file.get_metadata()
+                peak_amplitude_pos = metadata['peak_amplitude_positions']
+                # Gathering processed data
+                processed_IT = spheroid_file.get_processed_data_IT()
+
+                # Cropping IT to find first intersect before peak
+                diff_IT = np.diff(processed_IT)
+                diff_before_peak = diff_IT[start:peak_amplitude_pos - 1]
+                sharp_increase = np.argmax(diff_before_peak)
+                start_integration = start + sharp_increase + 1
+                print(f"File {j} of experiment {i}: start of integration = {start_integration}, peak at = {peak_amplitude_pos}")
+                # Cropping IT to find first intersect after peak
+                IT_cropped_after_peak = processed_IT[peak_amplitude_pos:]
+                zero_indices_after_peak = np.where(IT_cropped_after_peak == 0)[0]
+                if zero_indices_after_peak.size > 0:
+                    mapped_intersect = zero_indices_after_peak[0] + peak_amplitude_pos
+                else:
+                    min_amp_index = np.argmin(IT_cropped_after_peak)
+                    mapped_intersect = min_amp_index + peak_amplitude_pos
+                
+                # Just in case there is a very short range
+                if mapped_intersect >= start_integration:
+                    y = processed_IT[start_integration : mapped_intersect + 1]
+                    res_AUC = simpson(y)
+                else:
+                    res_AUC = 0
+
+                records_AUC.append(res_AUC)
+            all_AUC.append(records_AUC)
+        return all_AUC
+    
+    def legacy_get_all_AUC(self):
+        from scipy.integrate import simpson
+
+        n_experiments = len(self.experiments)
+        if n_experiments == 0:
+            return None, None, None, None
         
         all_AUC = []
         for i, experiment in enumerate(self.experiments):
