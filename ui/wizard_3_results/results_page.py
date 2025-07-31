@@ -79,7 +79,6 @@ class ResultsPage(QWizardPage):
 
         self.setLayout(main_layout)
 
-
     def _reveal_and_call(self, plot_fn):
         """Hide placeholder and show canvas, then call the plotting fn."""
         if self.placeholder.isVisible():
@@ -111,6 +110,7 @@ class ResultsPage(QWizardPage):
             OutputManager.save_all_peak_amplitudes(ga, output_folder)
             OutputManager.save_all_reuptake_curves(ga, output_folder)
             OutputManager.save_all_exponential_fitting_params(ga, output_folder)
+            OutputManager.save_all_AUC(ga, output_folder)
         except Exception as e:
             QMessageBox.critical(
                 self, "Export Failed",

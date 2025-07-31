@@ -268,11 +268,18 @@ class GroupAnalysis:
                 processed_IT = spheroid_file.get_processed_data_IT()
                 # Cropping IT to find first intersect after peak
                 IT_cropped = processed_IT[peak_amplitude_pos:]
-                # Finding the first intersect
-                zero_index = np.where(IT_cropped==0)[0]
-                # Mapping the intersect back to the original IT indexes
-                first_0_intersect = zero_index[0] + peak_amplitude_pos
-                res_AUC = simpson(processed_IT[:first_0_intersect])
+                zero_indices = np.where(IT_cropped == 0)[0]
+                if zero_indices.size > 0:
+                    mapped_intersect = zero_indices[0] + peak_amplitude_pos
+                else:
+                    min_amp_index = np.argmin(IT_cropped)
+                    mapped_intersect = min_amp_index + peak_amplitude_pos
+                # Just in case there is a very short range
+                if mapped_intersect <= 1:
+                    res_AUC = 0 
+                else:
+                    res_AUC = simpson(processed_IT[:mapped_intersect + 1])
+
                 records_AUC.append(res_AUC)
             all_AUC.append(records_AUC)
         return all_AUC
