@@ -266,19 +266,29 @@ class GroupAnalysis:
                 peak_amplitude_pos = metadata['peak_amplitude_positions']
                 # Gathering processed data
                 processed_IT = spheroid_file.get_processed_data_IT()
-                # Cropping IT to find first intersect after peak
-                IT_cropped = processed_IT[peak_amplitude_pos:]
-                zero_indices = np.where(IT_cropped == 0)[0]
-                if zero_indices.size > 0:
-                    mapped_intersect = zero_indices[0] + peak_amplitude_pos
+
+                # Cropping IT to find first intersect before peak
+                IT_cropped_before_peak = processed_IT[:peak_amplitude_pos]
+                zero_indices_before_peak = np.where(IT_cropped_before_peak == 0)[0]
+                if zero_indices_before_peak.size > 0:
+                    # Getting the last zero before the peak
+                    mapped_intersect_before = zero_indices_before_peak[-1]
                 else:
-                    min_amp_index = np.argmin(IT_cropped)
+                    mapped_intersect_before = 0  # fallback to start
+                # Cropping IT to find first intersect after peak
+                IT_cropped_after_peak = processed_IT[peak_amplitude_pos:]
+                zero_indices_after_peak = np.where(IT_cropped_after_peak == 0)[0]
+                if zero_indices_after_peak.size > 0:
+                    mapped_intersect = zero_indices_after_peak[0] + peak_amplitude_pos
+                else:
+                    min_amp_index = np.argmin(IT_cropped_after_peak)
                     mapped_intersect = min_amp_index + peak_amplitude_pos
+                
                 # Just in case there is a very short range
                 if mapped_intersect <= 1:
                     res_AUC = 0 
                 else:
-                    res_AUC = simpson(processed_IT[:mapped_intersect + 1])
+                    res_AUC = simpson(processed_IT[mapped_intersect_before:mapped_intersect + 1])
 
                 records_AUC.append(res_AUC)
             all_AUC.append(records_AUC)
