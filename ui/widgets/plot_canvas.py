@@ -7,7 +7,25 @@ import numpy as np
 from PyQt5.QtCore import Qt
 
 class PlotCanvas(FigureCanvas):
+    """
+    A Qt-compatible Matplotlib canvas for visualizing FSCV data.
+
+    This class supports:
+    - Color plot rendering
+    - I-T profile visualization with peak annotation
+    - Group-level amplitude and exponential decay visualization
+    - Tau parameter tracking over time
+    """
     def __init__(self, parent=None, width=5, height=4, dpi=100):
+        """
+        Initialize the PlotCanvas.
+
+        Args:
+            parent (QWidget, optional): Parent widget.
+            width (float): Width of the figure in inches.
+            height (float): Height of the figure in inches.
+            dpi (int): Dots per inch for the figure.
+        """
         import matplotlib
 
         matplotlib.rcParams.update({
@@ -23,6 +41,17 @@ class PlotCanvas(FigureCanvas):
         self.cbar = None
 
     def plot_color(self, processed_data, peak_pos = None, title_suffix=None):
+        """
+        Display a 2D color plot of the FSCV data matrix.
+
+        Args:
+            processed_data (np.ndarray): 2D data array (voltage x time).
+            peak_pos (int, optional): Index of the peak position for annotation.
+            title_suffix (str, optional): Text to append to the plot title.
+
+        Returns:
+            None
+        """
         from core.spheroid_file import PLOT_SETTINGS  # Ensure it's correctly imported
 
         plot_settings = PLOT_SETTINGS()
@@ -63,12 +92,15 @@ class PlotCanvas(FigureCanvas):
 
     def plot_IT(self,processed_data, metadata=None, peak_position=None):
         """
-        Plot the I-T (Intensity-Time) profile on the Qt canvas.
+        Plot the I-T (Current vs Time) trace, with optional peak annotations.
 
-        Parameters:
-        - profile: 1D numpy array representing current over time
-        - metadata: dict containing 'peak_amplitude_positions' and optionally 'peak_amplitude_values'
-        - peak_position: optional, used for labeling the title
+        Args:
+            processed_data (np.ndarray): 2D data array (voltage x time).
+            metadata (dict, optional): Dictionary with peak positions/values.
+            peak_position (int, optional): Voltage index used for I-T extraction.
+
+        Returns:
+            None
         """
         self.fig.clear()
         self.axes.clear()
@@ -129,8 +161,13 @@ class PlotCanvas(FigureCanvas):
 
     def show_average_over_experiments(self, group_analysis):
         """
-        Plots the mean amplitudes over time across all experiments,
-        with the standard deviation as a shaded area.
+        Plot mean amplitude over time across all experiments with standard deviation.
+
+        Args:
+            group_analysis (GroupAnalysis): Backend object holding replicate experiments.
+
+        Returns:
+            None
         """
         import numpy as np
 
@@ -174,6 +211,16 @@ class PlotCanvas(FigureCanvas):
         progress.close()
 
     def show_decay_exponential_fitting(self, group_analysis, replicate_time_point=0):
+        """
+        Display exponential decay fitting across replicates for a selected time point.
+
+        Args:
+            group_analysis (GroupAnalysis): Object managing replicate data and fitting results.
+            replicate_time_point (int): Index of the replicate file/time point to fit.
+
+        Returns:
+            None
+        """
         from PyQt5.QtWidgets import QMessageBox
         # Show loading dialog
         progress = QProgressDialog("Processing data, please wait...", None, 0, 0, self)
@@ -281,7 +328,13 @@ class PlotCanvas(FigureCanvas):
 
     def show_tau_param_over_time(self, group_analysis):
         """
-        Plots the exponential decay parameter tau over replicate time points on the embedded canvas.
+        Plot the exponential decay constant (tau) across replicate time points.
+
+        Args:
+            group_analysis (GroupAnalysis): Group container with all experiment replicates.
+
+        Returns:
+            None
         """
         import numpy as np
 
@@ -315,7 +368,13 @@ class PlotCanvas(FigureCanvas):
 
     def show_amplitudes_over_time(self, group_analysis):
         """
-        Plot all amplitudes over time for each experiment as separate lines on the embedded canvas.
+        Plot raw amplitude traces for each experiment across all time points.
+
+        Args:
+            group_analysis (GroupAnalysis): Object holding multiple replicate experiments.
+
+        Returns:
+            None
         """
         import numpy as np
 

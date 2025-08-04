@@ -14,6 +14,19 @@ import os
 ### Third Page
 
 class ResultsPage(QWizardPage):
+    """
+    Wizard page for visualizing and exporting group-level analysis results.
+
+    Provides options to:
+    - Plot amplitude metrics over time.
+    - Visualize decay fitting and tau parameters.
+    - Export metrics and figures to files.
+
+    Attributes:
+        result_plot (PlotCanvas): Matplotlib canvas for displaying results.
+        analysis_buttons (list): List of QPushButtons tied to specific analysis/export actions.
+        placeholder (QLabel): Placeholder shown before any plot is displayed.
+    """
     def __init__(self, parent=None):
         super().__init__(parent)
 
@@ -80,13 +93,30 @@ class ResultsPage(QWizardPage):
         self.setLayout(main_layout)
 
     def _reveal_and_call(self, plot_fn):
-        """Hide placeholder and show canvas, then call the plotting fn."""
+        """
+        Reveal the plot canvas and call a plotting function.
+
+        Args:
+            plot_fn (callable): A function that renders to `self.result_plot`.
+        """
         if self.placeholder.isVisible():
             self.placeholder.hide()
             self.result_plot.show()
         plot_fn()
 
     def export_all_as_csv(self):
+        """
+        Export all computed group-level metrics as CSV files.
+
+        Metrics include:
+            - I-T traces
+            - Amplitudes
+            - Reuptake curves
+            - Exponential fit parameters
+            - AUC values
+
+        Displays status dialogs and error messages as needed.
+        """
         output_folder = QSettings("HashemiLab", "NeuroStemVolt").value("output_folder")
         if not output_folder or not os.path.isdir(output_folder):
             QMessageBox.warning(
@@ -125,7 +155,11 @@ class ResultsPage(QWizardPage):
             progress.hide()
 
     def save_current_plot(self):
-        """Save the currently displayed plot as a PNG file."""
+        """
+        Save the currently displayed result plot as a PNG image.
+        
+        Prompts the user for a filename using QFileDialog.
+        """
         options = QFileDialog.Options()
         file_path, _ = QFileDialog.getSaveFileName(
             self,
@@ -139,7 +173,17 @@ class ResultsPage(QWizardPage):
             QMessageBox.information(self, "Plot Saved", f"Plot saved to:\n{file_path}")
 
     def save_all_plots(self):
-        """Save all group-level plots using OutputManager."""
+        """
+        Save all result plots to the configured output directory.
+
+        Plots include:
+            - Mean I-T traces
+            - Tau parameter over time
+            - Exponential decay fits
+            - Amplitude trajectories
+
+        Displays a progress dialog during export and handles exceptions.
+        """
         output_folder = QSettings("HashemiLab", "NeuroStemVolt").value("output_folder")
         group_analysis = self.wizard().group_analysis
         if not output_folder or not os.path.isdir(output_folder):
@@ -177,12 +221,20 @@ class ResultsPage(QWizardPage):
             progress.hide()
     
     def initializePage(self):
+        """
+        Called when the page is first displayed.
+
+        Enables or disables analysis buttons depending on whether experiments are loaded.
+        """
         if self.wizard().group_analysis.get_experiments():
             self.enable_analysis_buttons()
         else:
             self.clear_all()
 
     def clear_all(self):
+        """
+        Clears the result plot and disables analysis buttons.
+        """
         # Clear the plot
         self.result_plot.fig.clear()
         self.result_plot.draw()
@@ -191,10 +243,17 @@ class ResultsPage(QWizardPage):
             btn.setEnabled(False)
 
     def enable_analysis_buttons(self):
+        """
+        Enables all buttons tied to group-level analysis or export functions.
+        """
         for btn in getattr(self, 'analysis_buttons', []):
             btn.setEnabled(True)
 
     def handle_decay_fit(self):
+        """
+        Prompts the user to select a timepoint and displays the exponential decay fit
+        for that timepoint using the group analysis results.
+        """
         group_analysis = self.wizard().group_analysis
         experiments = group_analysis.get_experiments()
         if not experiments:
