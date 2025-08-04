@@ -250,7 +250,7 @@ class GroupAnalysis:
         mean_amplitudes = np.nanmean(all_amplitudes, axis=0)
         return time_points, mean_amplitudes, all_amplitudes, files_before_treatment
     
-    def get_all_AUC(self, show_plot: bool = False):
+    def get_all_AUC(self, show_plot: bool = True):
         import numpy as np
         from scipy.integrate import simpson
         import matplotlib.pyplot as plt
@@ -352,6 +352,50 @@ class GroupAnalysis:
 
             all_AUC.append(records_AUC)
 
+        return all_AUC
+    
+    def legacy_get_all_AUC(self):
+        from scipy.integrate import simpson
+
+        n_experiments = len(self.experiments)
+        if n_experiments == 0:
+            return None, None, None, None
+        
+        all_AUC = []
+        for i, experiment in enumerate(self.experiments):
+            records_AUC = []
+            for j, spheroid_file in enumerate(experiment.files):
+                # Gathering position of peak
+                metadata = spheroid_file.get_metadata()
+                peak_amplitude_pos = metadata['peak_amplitude_positions']
+                # Gathering processed data
+                processed_IT = spheroid_file.get_processed_data_IT()
+
+                # Cropping IT to find first intersect before peak
+                IT_cropped_before_peak = processed_IT[:peak_amplitude_pos]
+                zero_indices_before_peak = np.where(IT_cropped_before_peak == 0)[0]
+                if zero_indices_before_peak.size > 0:
+                    # Getting the last zero before the peak
+                    mapped_intersect_before = zero_indices_before_peak[-1]
+                else:
+                    mapped_intersect_before = 0  # fallback to start
+                # Cropping IT to find first intersect after peak
+                IT_cropped_after_peak = processed_IT[peak_amplitude_pos:]
+                zero_indices_after_peak = np.where(IT_cropped_after_peak == 0)[0]
+                if zero_indices_after_peak.size > 0:
+                    mapped_intersect = zero_indices_after_peak[0] + peak_amplitude_pos
+                else:
+                    min_amp_index = np.argmin(IT_cropped_after_peak)
+                    mapped_intersect = min_amp_index + peak_amplitude_pos
+                
+                # Just in case there is a very short range
+                if mapped_intersect <= 1:
+                    res_AUC = 0 
+                else:
+                    res_AUC = simpson(processed_IT[mapped_intersect_before:mapped_intersect + 1])
+
+                records_AUC.append(res_AUC)
+            all_AUC.append(records_AUC)
         return all_AUC
 
     def exponential_fitting_replicated(self, replicate_time_point=0, global_peak_amplitude_position=None):
