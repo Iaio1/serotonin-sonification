@@ -250,99 +250,108 @@ class GroupAnalysis:
         mean_amplitudes = np.nanmean(all_amplitudes, axis=0)
         return time_points, mean_amplitudes, all_amplitudes, files_before_treatment
     
-    def get_all_AUC(self):
+    def get_all_AUC(self, show_plot: bool = False):
+        import numpy as np
         from scipy.integrate import simpson
+        import matplotlib.pyplot as plt
 
         n_experiments = len(self.experiments)
         if n_experiments == 0:
-            return None, None, None, None
-        exp = self.experiments[0]
-        acq_freq = exp.get_acquisition_frequency()
-        
-        if exp.stim_params.get("start") == None:
-            start = 0
-        else:  
-            start = int(exp.stim_params.get("start"))
-            start = acq_freq * start
+            return None
 
         all_AUC = []
         for i, experiment in enumerate(self.experiments):
             records_AUC = []
+            acq_freq = experiment.get_acquisition_frequency()
+            stim_params = experiment.stim_params
+
+            # Determine stimulation parameters
+            if stim_params is not None:
+                start_stim = int(stim_params['start'] * acq_freq)
+                dur_stim = int(stim_params['duration'] * acq_freq)
+                is_stim = True
+            else:
+                is_stim = False
+                grad_start = 0
+
             for j, spheroid_file in enumerate(experiment.files):
-                # Gathering position of peak
+                # Metadata and raw signal
                 metadata = spheroid_file.get_metadata()
-                peak_amplitude_pos = metadata['peak_amplitude_positions']
-                # Gathering processed data
-                processed_IT = spheroid_file.get_processed_data_IT()
+                peak_idx = metadata['peak_amplitude_positions']
+                raw = spheroid_file.get_processed_data_IT()
+                sig = raw.copy()
 
-                # Cropping IT to find first intersect before peak
-                diff_IT = np.diff(processed_IT)
-                diff_before_peak = diff_IT[start:peak_amplitude_pos - 1]
-                sharp_increase = np.argmax(diff_before_peak)
-                start_integration = start + sharp_increase + 1
-                print(f"File {j} of experiment {i}: start of integration = {start_integration}, peak at = {peak_amplitude_pos}")
-                # Cropping IT to find first intersect after peak
-                IT_cropped_after_peak = processed_IT[peak_amplitude_pos:]
-                zero_indices_after_peak = np.where(IT_cropped_after_peak == 0)[0]
-                if zero_indices_after_peak.size > 0:
-                    mapped_intersect = zero_indices_after_peak[0] + peak_amplitude_pos
-                else:
-                    min_amp_index = np.argmin(IT_cropped_after_peak)
-                    mapped_intersect = min_amp_index + peak_amplitude_pos
-                
-                # Just in case there is a very short range
-                if mapped_intersect >= start_integration:
-                    y = processed_IT[start_integration : mapped_intersect + 1]
-                    res_AUC = simpson(y)
-                else:
-                    res_AUC = 0
+                # Optionally plot original data
+                if show_plot:
+                    fig, ax = plt.subplots()
+                    x_all = np.arange(len(raw))
+                    ax.scatter(x_all, raw, s=10, alpha=0.4, label='Original data')
 
-                records_AUC.append(res_AUC)
+                # Remove stim artifact or find gradient start
+                if is_stim:
+                    end_stim = start_stim + dur_stim
+                    xp = [start_stim - 1, end_stim]
+                    fp = [sig[xp[0]], sig[xp[1]]]
+                    sig[start_stim:end_stim] = np.interp(
+                        np.arange(start_stim, end_stim), xp, fp
+                    )
+                    start_integration = start_stim
+                    if show_plot:
+                        ax.plot(x_all, sig, linewidth=1, label='Processed (artifact removed)')
+                else:
+                    diff_IT = np.diff(sig)
+                    window = diff_IT[grad_start:peak_idx]
+                    sharp = np.argmax(window)
+                    start_integration = grad_start + sharp + 1
+                    if show_plot:
+                        ax.plot(x_all, sig, linewidth=1, label='Processed (no artifact)')
+                        ax.axvline(start_integration, color='green', linestyle='--', label='Integration start')
+
+                # Find end of integration by detecting zero crossing between samples
+                post_peak = sig[peak_idx:]
+                # look for sign change between consecutive points
+                prod = post_peak[:-1] * post_peak[1:]
+                zero_cross_inds = np.where(prod <= 0)[0]
+                if zero_cross_inds.size > 0:
+                    # choose first crossing, adjust index to sample after peak
+                    cross_idx = zero_cross_inds[0] + 1
+                    end_integration = peak_idx + cross_idx
+                else:
+                    # fallback to minimal point
+                    end_integration = peak_idx + np.argmin(post_peak)
+
+                # Ensure valid window
+                if end_integration <= start_integration:
+                    end_integration = len(sig) - 1
+                    if show_plot:
+                        ax.plot(x_all, sig, linestyle=':', label='Fallback end (signal end)')
+
+                # Compute AUC
+                if end_integration >= start_integration:
+                    x_int = np.arange(start_integration, end_integration + 1)
+                    y_int = sig[start_integration:end_integration + 1]
+                    auc_val = simpson(y_int)
+                    if show_plot:
+                        ax.fill_between(x_int, y_int, alpha=0.3, label='AUC region')
+                        ax.plot(x_int, y_int, linewidth=2, label='Integration curve')
+                else:
+                    auc_val = 0.0
+
+                # Finalize plot
+                if show_plot:
+                    ax.axvline(peak_idx, color='red', linestyle='--', label='Peak')
+                    ax.axvline(end_integration, color='purple', linestyle='-.', label='Integration end')
+                    ax.legend(loc='best', fontsize='small')
+                    ax.set_title(f'Exp {i} File {j} — AUC={auc_val:.2f}')
+                    ax.set_xlabel('Sample Index')
+                    ax.set_ylabel('Signal Amplitude')
+                    plt.tight_layout()
+                    plt.show()
+
+                records_AUC.append(auc_val)
+
             all_AUC.append(records_AUC)
-        return all_AUC
-    
-    def legacy_get_all_AUC(self):
-        from scipy.integrate import simpson
 
-        n_experiments = len(self.experiments)
-        if n_experiments == 0:
-            return None, None, None, None
-        
-        all_AUC = []
-        for i, experiment in enumerate(self.experiments):
-            records_AUC = []
-            for j, spheroid_file in enumerate(experiment.files):
-                # Gathering position of peak
-                metadata = spheroid_file.get_metadata()
-                peak_amplitude_pos = metadata['peak_amplitude_positions']
-                # Gathering processed data
-                processed_IT = spheroid_file.get_processed_data_IT()
-
-                # Cropping IT to find first intersect before peak
-                IT_cropped_before_peak = processed_IT[:peak_amplitude_pos]
-                zero_indices_before_peak = np.where(IT_cropped_before_peak == 0)[0]
-                if zero_indices_before_peak.size > 0:
-                    # Getting the last zero before the peak
-                    mapped_intersect_before = zero_indices_before_peak[-1]
-                else:
-                    mapped_intersect_before = 0  # fallback to start
-                # Cropping IT to find first intersect after peak
-                IT_cropped_after_peak = processed_IT[peak_amplitude_pos:]
-                zero_indices_after_peak = np.where(IT_cropped_after_peak == 0)[0]
-                if zero_indices_after_peak.size > 0:
-                    mapped_intersect = zero_indices_after_peak[0] + peak_amplitude_pos
-                else:
-                    min_amp_index = np.argmin(IT_cropped_after_peak)
-                    mapped_intersect = min_amp_index + peak_amplitude_pos
-                
-                # Just in case there is a very short range
-                if mapped_intersect <= 1:
-                    res_AUC = 0 
-                else:
-                    res_AUC = simpson(processed_IT[mapped_intersect_before:mapped_intersect + 1])
-
-                records_AUC.append(res_AUC)
-            all_AUC.append(records_AUC)
         return all_AUC
 
     def exponential_fitting_replicated(self, replicate_time_point=0, global_peak_amplitude_position=None):
