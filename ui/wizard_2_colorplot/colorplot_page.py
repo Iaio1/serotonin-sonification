@@ -359,6 +359,8 @@ class ColorPlotPage(QWizardPage):
                 print(f"Error applying peak detection change: {e}")
                 import traceback
                 traceback.print_exc()
+        self.completeChanged.emit()
+        self.btn_next.setEnabled(self.isComplete())
 
     def run_processing(self):
         group_analysis = self.wizard().group_analysis
@@ -397,6 +399,8 @@ class ColorPlotPage(QWizardPage):
             exp.run()
 
         self.update_file_display()
+        self.completeChanged.emit()
+        self.btn_next.setEnabled(self.isComplete())
         progress.close()
 
 
@@ -405,6 +409,8 @@ class ColorPlotPage(QWizardPage):
         for exp in group_analysis.get_experiments():
             exp.revert_processing()
         self.update_file_display()
+        self.completeChanged.emit()
+        self.btn_next.setEnabled(self.isComplete())
 
     def show_processing_options(self):
         dlg = ProcessingOptionsDialog(self)
@@ -417,6 +423,17 @@ class ColorPlotPage(QWizardPage):
                 if dlg.get_processor_instance(name, peak_pos) is not None
             ]
 
+    def isComplete(self):
+        group_analysis = self.wizard().group_analysis
+        try:
+            exp = group_analysis.get_single_experiments(self.current_rep_index)
+            actual_file_index = self.file_index_mapping[self.current_file_index]
+            sph_file = exp.get_spheroid_file(actual_file_index)
+            metadata = sph_file.get_metadata()
+            return metadata.get("peak_amplitude_positions") is not None
+        except Exception:
+            return False
+
     def validatePage(self):
         # Automatically add appropriate processor based on file type and run it before proceeding
         group_analysis = self.wizard().group_analysis
@@ -427,15 +444,15 @@ class ColorPlotPage(QWizardPage):
         file_type = settings.value("file_type", "None", type=str)
 
         # Choose the appropriate processor
-        if file_type == "Spontaneous":
-            from core.processing.spontaneous_peak_detector import FindAmplitudeMultiple
-            processor = FindAmplitudeMultiple(peak_pos)
-        else:
-            processor = FindAmplitude(peak_pos)
+        #if file_type == "Spontaneous":
+            #from core.processing.spontaneous_peak_detector import FindAmplitudeMultiple
+            #processor = FindAmplitudeMultiple(peak_pos)
+        #else:
+            #processor = FindAmplitude(peak_pos)
 
-        for exp in group_analysis.get_experiments():
-            exp.set_processing_steps([processor])
-            exp.run()
+        #for exp in group_analysis.get_experiments():
+            #exp.set_processing_steps([processor])
+            #exp.run()
 
         return True  # allow transition to next page
 
