@@ -7,6 +7,8 @@ import json
 from ui.utils.ui_helpers import make_labeled_field_with_help
 from core.processing import BackgroundSubtraction, SavitzkyGolayFilter, RollingMean, GaussianSmoothing2D, ButterworthFilter, BaselineCorrection, Normalize, FindAmplitude, ExponentialFitting
 
+from core.processing.spontaneous_peak_detector import FindAmplitudeMultiple
+
 class ProcessingOptionsDialog(QDialog):
     def __init__(self, parent=None, defaults=None):
         super().__init__(parent)
@@ -16,12 +18,12 @@ class ProcessingOptionsDialog(QDialog):
         self.processor_options = [
             ("Background Subtraction", True),
             ("Rolling Mean", False),
-            #("Gaussian Smoothing 2D", False)
             ("Butterworth Filter", True),
             ("Savitzky-Golay Filter", False),
             ("Baseline Correction", True),
             ("Normalize", True),
             ("Find Amplitude", True),
+            ("Multiple Peak Detection", False),  # New option
         ]
 
         self.checkboxes = {}
@@ -37,11 +39,11 @@ class ProcessingOptionsDialog(QDialog):
         help_texts = {
             "Background Subtraction": "Subtracts baseline offset by averaging the signal between a specified 'start' and 'end' segment (given as data indices or time points at the beginning of the trace) and subtracting that mean from the entire recording.",
             "Rolling Mean": "Smooths the trace by computing a moving average over a sliding window of N points. The 'window size' parameter sets how many consecutive samples are included in each average. Larger windows yield smoother traces but can blur sharp features.",
-            #"Gaussian Smoothing 2D": "Applies 2D Gaussian blur to reduce noise.",
             "Butterworth Filter": "Applies a low-pass filter while preserving waveform.",
             "Savitzky-Golay Filter": "Fits a local polynomial of a given 'order' over each segment of the data to smooth noise. The 'window size' sets how many points are used per fit, while 'order' (the 'p' polynomial order) controls how closely the fit can follow rapid changes.",
             "Baseline Correction": "Removes baseline drift from the signal.",
             "Normalize": "Normalizes each trace based on the peak amplitude of the first file within each replicate.",
+            "Multiple Peak Detection": "Detects multiple spontaneous peaks throughout the signal using adaptive validation windows. Useful for analyzing spontaneous activity patterns.",
         }
 
         for name, default_checked in self.processor_options:
@@ -119,6 +121,65 @@ class ProcessingOptionsDialog(QDialog):
                 rm_container.hide()
                 param_widget = rm_container
                 self.param_widgets[name] = rm_window
+            elif name == "Multiple Peak Detection":
+                # Parameters for multiple peak detection
+                mpd_layout = QVBoxLayout()
+
+                # Max peaks
+                max_peaks_layout = QHBoxLayout()
+                max_peaks_label = QLabel("Max Peaks:")
+                max_peaks_label.setStyleSheet("font-size: 11px; color: #555; margin-left: 16px;")
+                max_peaks_edit = QLineEdit("10")
+                max_peaks_layout.addWidget(max_peaks_label)
+                max_peaks_layout.addWidget(max_peaks_edit)
+
+                # Min prominence
+                prominence_layout = QHBoxLayout()
+                prominence_label = QLabel("Min Prominence:")
+                prominence_label.setStyleSheet("font-size: 11px; color: #555; margin-left: 16px;")
+                prominence_edit = QLineEdit("0.5")
+                prominence_layout.addWidget(prominence_label)
+                prominence_layout.addWidget(prominence_edit)
+
+                # Rise window
+                rise_layout = QHBoxLayout()
+                rise_label = QLabel("Rise Window (sec):")
+                rise_label.setStyleSheet("font-size: 11px; color: #555; margin-left: 16px;")
+                rise_edit = QLineEdit("3.0")
+                rise_layout.addWidget(rise_label)
+                rise_layout.addWidget(rise_edit)
+
+                # Decay window
+                decay_layout = QHBoxLayout()
+                decay_label = QLabel("Decay Window (sec):")
+                decay_label.setStyleSheet("font-size: 11px; color: #555; margin-left: 16px;")
+                decay_edit = QLineEdit("10.0")
+                decay_layout.addWidget(decay_label)
+                decay_layout.addWidget(decay_edit)
+
+                if "Multiple Peak Detection" in saved_params:
+                    params = saved_params["Multiple Peak Detection"]
+                    max_peaks_edit.setText(str(params.get("max_peaks", "10")))
+                    prominence_edit.setText(str(params.get("min_prominence", "0.5")))
+                    rise_edit.setText(str(params.get("rise_window_sec", "3.0")))
+                    decay_edit.setText(str(params.get("decay_window_sec", "10.0")))
+
+                mpd_layout.addLayout(max_peaks_layout)
+                mpd_layout.addLayout(prominence_layout)
+                mpd_layout.addLayout(rise_layout)
+                mpd_layout.addLayout(decay_layout)
+
+                mpd_container = QWidget()
+                mpd_container.setLayout(mpd_layout)
+                mpd_container.setContentsMargins(24, 0, 0, 0)  # Indent
+                mpd_container.hide()
+                param_widget = mpd_container
+                self.param_widgets[name] = {
+                    "max_peaks": max_peaks_edit,
+                    "min_prominence": prominence_edit,
+                    "rise_window_sec": rise_edit,
+                    "decay_window_sec": decay_edit
+                }
 
             # Add parameter widget to filter layout if it exists
             if param_widget:
@@ -177,7 +238,33 @@ class ProcessingOptionsDialog(QDialog):
         elif name == "Normalize":
             return Normalize(peak_position)
         elif name == "Find Amplitude":
-            return FindAmplitude(peak_position)
+            # Check file type to determine which amplitude finder to use
+            settings = QSettings("HashemiLab", "NeuroStemVolt")
+            file_type = settings.value("file_type", "None", type=str)
+
+            if file_type == "Spontaneous":
+                return FindAmplitudeMultiple(peak_position)
+            else:
+                return FindAmplitude(peak_position)
+        elif name == "Multiple Peak Detection":
+            params = self.param_widgets[name]
+            try:
+                max_peaks = int(params["max_peaks"].text())
+                min_prominence = float(params["min_prominence"].text())
+                rise_window_sec = float(params["rise_window_sec"].text())
+                decay_window_sec = float(params["decay_window_sec"].text())
+            except ValueError:
+                max_peaks = 10
+                min_prominence = 0.5
+                rise_window_sec = 3.0
+                decay_window_sec = 10.0
+            return FindAmplitudeMultiple(
+                peak_position=peak_position,
+                max_peaks=max_peaks,
+                min_prominence=min_prominence,
+                rise_window_sec=rise_window_sec,
+                decay_window_sec=decay_window_sec
+            )
         elif name == "Exponential Fitting":
             return ExponentialFitting()
         else:
@@ -194,7 +281,15 @@ class ProcessingOptionsDialog(QDialog):
         # now save params
         out = {}
         for name, widget in self.param_widgets.items():
-            if isinstance(widget, tuple):
+            if name == "Multiple Peak Detection":
+                # Special handling for multiple peak detection parameters
+                out[name] = {
+                    "max_peaks": widget["max_peaks"].text(),
+                    "min_prominence": widget["min_prominence"].text(),
+                    "rise_window_sec": widget["rise_window_sec"].text(),
+                    "decay_window_sec": widget["decay_window_sec"].text()
+                }
+            elif isinstance(widget, tuple):
                 # multiple-lineEdits
                 out[name] = [w.text() for w in widget]
             else:

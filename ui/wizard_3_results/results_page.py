@@ -23,12 +23,23 @@ class ResultsPage(QWizardPage):
         btn_param  = QPushButton("Tau Over Time");                 apply_custom_styles(btn_param)
         btn_amp    = QPushButton("Individual Amplitudes Over Time");          apply_custom_styles(btn_amp)
 
+        # Spontaneous analysis buttons
+        self.btn_spont_freq = QPushButton("Spontaneous Peak Frequency");     apply_custom_styles(self.btn_spont_freq)
+        self.btn_spont_amp = QPushButton("Spontaneous Peak Amplitudes");     apply_custom_styles(self.btn_spont_amp)
+        self.spontaneous_buttons = [self.btn_spont_freq, self.btn_spont_amp]
+
+        # Initially hide spontaneous buttons
+        for btn in self.spontaneous_buttons:
+            btn.hide()
+
         # grid of analysis buttons
         analysis = QGridLayout()
         analysis.addWidget(btn_avg,    0, 0)
         analysis.addWidget(btn_fit,    1, 1)
         analysis.addWidget(btn_param,  1, 0)
         analysis.addWidget(btn_amp,    0, 1)
+        analysis.addWidget(self.btn_spont_freq, 2, 0)
+        analysis.addWidget(self.btn_spont_amp, 2, 1)
 
         # save/export buttons
         btn_save     = QPushButton("Save Current Plot");          apply_custom_styles(btn_save)
@@ -49,6 +60,8 @@ class ResultsPage(QWizardPage):
             (btn_fit,   self.handle_decay_fit),
             (btn_param, lambda: self.result_plot.show_tau_param_over_time(self.wizard().group_analysis)),
             (btn_amp,   lambda: self.result_plot.show_amplitudes_over_time(self.wizard().group_analysis)),
+            (self.btn_spont_freq, lambda: self.result_plot.show_spontaneous_peak_frequency(self.wizard().group_analysis)),
+            (self.btn_spont_amp, lambda: self.result_plot.show_spontaneous_peak_amplitudes(self.wizard().group_analysis)),
         ):
             btn.clicked.connect(lambda _, f=fn: self._reveal_and_call(f))
 
@@ -111,6 +124,12 @@ class ResultsPage(QWizardPage):
             OutputManager.save_all_peak_amplitudes(ga, output_folder)
             OutputManager.save_all_reuptake_curves(ga, output_folder)
             OutputManager.save_all_exponential_fitting_params(ga, output_folder)
+
+            # Export spontaneous peak metrics if applicable
+            settings = QSettings("HashemiLab", "NeuroStemVolt")
+            file_type = settings.value("file_type", "None", type=str)
+            if file_type == "Spontaneous":
+                OutputManager.save_spontaneous_peak_metrics(ga, output_folder)
         except Exception as e:
             QMessageBox.critical(
                 self, "Export Failed",
@@ -162,6 +181,20 @@ class ResultsPage(QWizardPage):
             OutputManager.save_plot_exponential_fit_aligned(group_analysis, output_folder)
             OutputManager.save_plot_all_amplitudes_over_time(group_analysis, output_folder)
             OutputManager.save_plot_mean_amplitudes_over_time(group_analysis, output_folder)
+
+            # Save spontaneous analysis plots if applicable
+            settings = QSettings("HashemiLab", "NeuroStemVolt")
+            file_type = settings.value("file_type", "None", type=str)
+            if file_type == "Spontaneous":
+                # Create temporary plots and save them
+                self.result_plot.show_spontaneous_peak_amplitudes(group_analysis)
+                self.result_plot.fig.savefig(os.path.join(output_folder, "spontaneous_peak_amplitudes.png"), 
+                                           dpi=300, bbox_inches='tight')
+
+                self.result_plot.show_spontaneous_peak_frequency(group_analysis)
+                self.result_plot.fig.savefig(os.path.join(output_folder, "spontaneous_peak_frequency.png"),
+                                           dpi=300, bbox_inches='tight')
+
             # Add more OutputManager plot saves as needed
         except Exception as e:
             QMessageBox.critical(
@@ -179,6 +212,16 @@ class ResultsPage(QWizardPage):
     def initializePage(self):
         if self.wizard().group_analysis.get_experiments():
             self.enable_analysis_buttons()
+            # Check if spontaneous analysis should be shown
+            settings = QSettings("HashemiLab", "NeuroStemVolt")
+            file_type = settings.value("file_type", "None", type=str)
+            if file_type == "Spontaneous":
+                for btn in self.spontaneous_buttons:
+                    btn.show()
+                    btn.setEnabled(True)
+            else:
+                for btn in self.spontaneous_buttons:
+                    btn.hide()
         else:
             self.clear_all()
 
@@ -188,6 +231,10 @@ class ResultsPage(QWizardPage):
         self.result_plot.draw()
         # Optionally disable analysis/export buttons
         for btn in getattr(self, 'analysis_buttons', []):
+            btn.setEnabled(False)
+        # Hide and disable spontaneous buttons
+        for btn in getattr(self, 'spontaneous_buttons', []):
+            btn.hide()
             btn.setEnabled(False)
 
     def enable_analysis_buttons(self):

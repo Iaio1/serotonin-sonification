@@ -483,11 +483,11 @@ class Waveforms:
         total_time(): Returns total scan time.
         voltage_waveform(): Returns numpy array with voltage for each point.
     """
-    Vstart: float = 0.2
-    Vvertices: List[float] = field(default_factory=lambda: [1, -0.1])
-    Vend: float = 0.2
-    scan_rate: int = 1000
-    N_data_points: int = 1100
+    Vstart: float = -0.5
+    Vvertices: List[float] = field(default_factory=lambda: [-0.7, 1.1])
+    Vend: float = -0.5
+    scan_rate: int = 600
+    N_data_points: int = 3000
 
     def get_segments(self):
         """Generate consecutive (start, end) pairs for all waveform segments."""

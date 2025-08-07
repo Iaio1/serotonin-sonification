@@ -33,19 +33,19 @@ class SpheroidExperiment:
     def __init__(
         self,
         filepaths,
-        file_length=60, # Default file length in seconds
+        file_length=60,
         acquisition_frequency=10, 
         peak_position=257,
         treatment="",
-        waveform="",  # Added waveform parameter
+        waveform="",
         stim_params=None,
-        processors=None,  # Default to None
-        time_between_files= 10.0, # Default time between files (between stimulations and recodings (e.g. stimulating every 10 min and recoding) in minutes
-        files_before_treatment = 3,  # Default number of files before treatment (e.g. baseline recordings)
+        processors=None,
+        time_between_files= 10.0,
+        files_before_treatment = 3,
         file_type = None
     ):
         if waveform is None:
-            self.waveform = "5HT" # Default waveform   
+            self.waveform = "5HT"
         else:
             self.waveform = waveform
 
@@ -60,20 +60,20 @@ class SpheroidExperiment:
 
         # Initialize processors after acquisition_frequency is set
         if processors is None:
+            # Choose the appropriate amplitude finder based on file type
+            if file_type == "Spontaneous":
+                from core.processing.spontaneous_peak_detector import FindAmplitudeMultiple
+                amplitude_processor = FindAmplitudeMultiple(self.peak_position)
+            else:
+                amplitude_processor = FindAmplitude(self.peak_position)
+            
             self.processors = [
                 BackgroundSubtraction(region=(0, 10)),
-                #GaussianSmoothing2D(),
-                #RollingMean(),
                 ButterworthFilter(),
-                #SavitzkyGolayFilter(w=20, p=2),
                 BaselineCorrection(),
                 Normalize(self.peak_position),
-                FindAmplitude(self.peak_position),
+                amplitude_processor,  # Use the appropriate processor
                 ExponentialFitting(),
-                #BackgroundSubtraction(region=(0, 10)),
-                #,
-                #ButterworthFilter(),
-                #No need to pass context here
             ]
         else:
             self.processors = processors
@@ -187,4 +187,3 @@ if __name__ == "__main__":
     experiment.get_spheroid_file(15).visualize_IT_with_exponential_decay()
     metadata = experiment.get_spheroid_file(1).get_metadata()
     print(metadata.keys(), metadata.values())
-
