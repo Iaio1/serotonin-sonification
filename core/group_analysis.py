@@ -111,7 +111,11 @@ class GroupAnalysis:
                 all_ITs[i*file_count+j, :] = IT_individual
 
         # Turning peak_amplitude_positions into a list of integers
-        peaks = [p.item() for p in peak_amplitude_positions]
+        # Turning peak_amplitude_positions into a list of integers
+        try:
+            peaks = [p.item() for p in peak_amplitude_positions]
+        except AttributeError:
+            peaks = [int(p) for p in peak_amplitude_positions]
         min_peak = np.min(peaks)
 
         pre_allocated_ITs_array = np.full((n_experiments*file_count, n_timepoints - min_peak), np.nan)       
@@ -273,7 +277,10 @@ class GroupAnalysis:
             all_ITs[i, :] = IT_individual
 
         # Turning peak_amplitude_positions into a list of integers
-        peaks = [p.item() for p in peak_amplitude_positions]
+        try:
+            peaks = [p.item() for p in peak_amplitude_positions]
+        except AttributeError:
+            peaks = [int(p) for p in peak_amplitude_positions]
         min_peak = np.min(peaks)
         max_peak = np.max(peaks)
         pre_allocated_ITs_array = np.full((n_experiments, n_timepoints - min_peak), np.nan)       
