@@ -30,7 +30,7 @@ class PlotCanvas(FigureCanvas):
         import matplotlib
 
         matplotlib.rcParams.update({
-            "font.family": ["Helvetica", "Arial"],
+            "font.family": ["Arial"],
             "font.size": 10,
         })
         fig = Figure(figsize=(width, height), dpi=dpi)
