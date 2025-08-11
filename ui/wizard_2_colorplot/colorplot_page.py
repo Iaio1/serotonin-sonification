@@ -91,6 +91,13 @@ class ColorPlotPage(QWizardPage):
         self.btn_export_all = QPushButton("Export All ITs")
         apply_custom_styles(self.btn_export_all)
         self.btn_export_all.clicked.connect(self.save_all_ITs)
+        self.btn_adj_peak = QPushButton("Apply Peak Adjustment")
+        apply_custom_styles(self.btn_adj_peak)
+        self.btn_adj_peak.clicked.connect(self.adjust_peak_position)
+        for b in (self.btn_prev, self.btn_next, self.btn_eval, self.btn_filter,
+          self.btn_save, self.btn_export, self.btn_export_all, self.btn_adj_peak):
+            b.setAutoDefault(False)
+            b.setDefault(False)
 
         self.peak_slider = QSlider(Qt.Orientation.Horizontal)
         self.peak_slider.setMinimum(0)
@@ -102,9 +109,7 @@ class ColorPlotPage(QWizardPage):
         self.peak_slider.setMaximumWidth(400)
         self.peak_slider.setFixedHeight(30)
 
-        self.btn_adj_peak = QPushButton("Apply Peak Adjustment")
-        apply_custom_styles(self.btn_adj_peak)
-        self.btn_adj_peak.clicked.connect(self.adjust_peak_position)
+        self._set_peak_controls_enabled(False)
 
         left = QVBoxLayout()
         left.addWidget(self.btn_revert)
@@ -232,16 +237,16 @@ class ColorPlotPage(QWizardPage):
         - Clears both replicate and file combo boxes.
         - Clears the color plot and I-T canvas visuals.
         """
-        # reset indices
         self.current_rep_index = 0
         self.current_file_index = 0
-
-        # empty the combo box & filename display
         self.cbo_rep.clear()
         self.cbo_file.clear()
 
-        # clear all canvases
-        for canvas in (self.main_plot, self.it_plot, self.cv_plot):
+        canvases = [self.main_plot, self.it_plot]
+        if hasattr(self, "cv_plot"):
+            canvases.append(self.cv_plot)
+
+        for canvas in canvases:
             canvas.fig.clear()
             canvas.draw()
 
@@ -258,6 +263,7 @@ class ColorPlotPage(QWizardPage):
         self.current_file_index = 0
         self._update_file_list_for_replicate(index)
         self.update_file_display()
+        self._set_peak_controls_enabled(self.isComplete())
 
     def on_file_changed(self, index):
         """
@@ -268,6 +274,7 @@ class ColorPlotPage(QWizardPage):
         """
         self.current_file_index = index
         self.update_file_display()
+        self._set_peak_controls_enabled(self.isComplete())
 
     def update_file_display(self):
         """
@@ -329,9 +336,9 @@ class ColorPlotPage(QWizardPage):
             self.cbo_file.setCurrentIndex(self.current_file_index)
 
     def on_peak_det_slider_value_changed(self, changed_value):
+        if not self.peak_slider.isEnabled() or not self.isComplete():
+            return
         self.temp_peak = changed_value
-        print(f"Peak detection slider changed to: {changed_value}")
-        # Update the IT plot to show the temporary position
         self.update_file_display()
 
     def adjust_peak_position(self):
@@ -415,7 +422,6 @@ class ColorPlotPage(QWizardPage):
                 import traceback
                 traceback.print_exc()
         self.completeChanged.emit()
-        self.btn_next.setEnabled(self.isComplete())
 
     def run_processing(self):
         """
@@ -462,7 +468,7 @@ class ColorPlotPage(QWizardPage):
 
         self.update_file_display()
         self.completeChanged.emit()
-        self.btn_next.setEnabled(self.isComplete())
+        self._set_peak_controls_enabled(self.isComplete())
         progress.close()
 
 
@@ -470,9 +476,10 @@ class ColorPlotPage(QWizardPage):
         group_analysis = self.wizard().group_analysis
         for exp in group_analysis.get_experiments():
             exp.revert_processing()
+        # disarm the slider & clear temp point
+        self._set_peak_controls_enabled(False)
         self.update_file_display()
         self.completeChanged.emit()
-        self.btn_next.setEnabled(self.isComplete())
 
     def show_processing_options(self):
         """
@@ -558,3 +565,13 @@ class ColorPlotPage(QWizardPage):
         sph_file = exp.get_spheroid_file(self.current_file_index)
         output_folder_path = QSettings("HashemiLab", "NeuroStemVolt").value("output_folder")
         OutputManager.save_IT_profile(sph_file,output_folder_path)
+
+    def _set_peak_controls_enabled(self, enabled: bool):
+        """
+        
+        """
+        self.peak_slider.setEnabled(enabled)
+        self.btn_adj_peak.setEnabled(enabled)
+        if not enabled:
+            # also clear any temporary selection so nothing is drawn
+            self.temp_peak = None
