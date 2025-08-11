@@ -2,6 +2,14 @@ from .base import Processor
 import numpy as np
 
 class RawMean(Processor):
+    """
+    Apply a simple moving average (smoothing) across time.
+
+    This performs 1D convolution using a flat kernel for each voltage step.
+
+    Args:
+        window_size (int): Width of the smoothing window.
+    """
     def __init__(self, window_size=5):
         self.window_size = window_size
 
