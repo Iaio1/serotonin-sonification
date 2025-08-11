@@ -9,6 +9,3 @@ dependencies:
   - matplotlib
   - pyqt
   - scipy
-  - pip
-  - pip:
-      - pyinstaller
