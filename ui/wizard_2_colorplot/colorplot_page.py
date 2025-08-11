@@ -497,16 +497,42 @@ class ColorPlotPage(QWizardPage):
                 if dlg.get_processor_instance(name, peak_pos) is not None
             ]
 
-    def isComplete(self):
+    def _missing_peaks(self):
+        """Return a list of (rep_index, file_index) that do not have peak metadata."""
+        missing = []
         group_analysis = self.wizard().group_analysis
-        try:
-            exp = group_analysis.get_single_experiments(self.current_rep_index)
-            actual_file_index = self.file_index_mapping[self.current_file_index]
-            sph_file = exp.get_spheroid_file(actual_file_index)
-            metadata = sph_file.get_metadata()
-            return metadata.get("peak_amplitude_positions") is not None
-        except Exception:
-            return False
+        for r_idx, exp in enumerate(group_analysis.get_experiments()):
+            file_count = exp.get_file_count()
+            for f_idx in range(file_count):
+                sf = exp.get_spheroid_file(f_idx)
+                md = sf.get_metadata() or {}
+                pos = md.get("peak_amplitude_positions")
+                # treat None or NaN as missing
+                if pos is None:
+                    missing.append((r_idx, f_idx))
+                else:
+                    try:
+                        import math
+                        if isinstance(pos, float) and math.isnan(pos):
+                            missing.append((r_idx, f_idx))
+                    except Exception:
+                        pass
+        return missing
+
+    def isComplete(self):
+        # Page is complete only if EVERY file in EVERY replicate has peaks.
+        return len(self._missing_peaks()) == 0
+    
+    #def isComplete(self):
+        #group_analysis = self.wizard().group_analysis
+        #try:
+           #exp = group_analysis.get_single_experiments(self.current_rep_index)
+            #actual_file_index = self.file_index_mapping[self.current_file_index]
+            #sph_file = exp.get_spheroid_file(actual_file_index)
+            #metadata = sph_file.get_metadata()
+            #return metadata.get("peak_amplitude_positions") is not None
+        #except Exception:
+            #return False
 
     def validatePage(self):
         """
