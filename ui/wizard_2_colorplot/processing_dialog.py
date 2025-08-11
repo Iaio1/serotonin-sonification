@@ -1,9 +1,10 @@
 from PyQt5.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QCheckBox, QLabel, QLineEdit, QDialogButtonBox, QWidget
+    QDialog, QVBoxLayout, QHBoxLayout, QCheckBox, QLabel, QLineEdit, QDialogButtonBox, QWidget, QPushButton
 )
 from PyQt5.QtCore import QSettings
 import json
 
+from ui.utils.styles import apply_custom_styles
 from ui.utils.ui_helpers import make_labeled_field_with_help
 from core.processing import BackgroundSubtraction, SavitzkyGolayFilter, RollingMean, GaussianSmoothing2D, ButterworthFilter, BaselineCorrection, Normalize, FindAmplitude, ExponentialFitting
 
@@ -211,6 +212,35 @@ class ProcessingOptionsDialog(QDialog):
             filter_container.setLayout(filter_layout)
             layout.addWidget(filter_container)
 
+        single_peak_layout = QHBoxLayout()
+        single_peak_layout.setContentsMargins(0, 0, 0, 0)
+        single_peak_layout.setSpacing(0)
+
+        self.find_amplitudes_btn = QPushButton("Single Peak Detection: ON")
+        self.find_amplitudes_btn.setCheckable(True)
+        self.find_amplitudes_btn.setChecked(True)   # Always starts ON
+        self.find_amplitudes_btn.setEnabled(False)  # Users can't click directly
+
+        # Apply your green general style
+        apply_custom_styles(self.find_amplitudes_btn)
+
+        # Add button flush-left in a horizontal layout
+        single_peak_layout.addWidget(self.find_amplitudes_btn)
+        single_peak_layout.addStretch()  # Pushes everything else to the left
+        layout.addLayout(single_peak_layout)
+
+        # Wire Multiple Peak Detection -> Single Peak Detection button state
+        mpd_cb = self.checkboxes.get("Multiple Peak Detection")
+        if mpd_cb is not None:
+            def sync_single_peak_detection(checked: bool):
+                # When MPD is on, Single Peak Detection shows OFF; otherwise ON
+                self.find_amplitudes_btn.setChecked(not checked)
+                self.find_amplitudes_btn.setText(
+                    "Single Peak Detection: OFF" if checked else "Single Peak Detection: ON"
+                )
+            sync_single_peak_detection(mpd_cb.isChecked())  # Initial state
+            mpd_cb.toggled.connect(sync_single_peak_detection)
+        
         # Dialog buttons
         buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         buttons.accepted.connect(self.accept)
