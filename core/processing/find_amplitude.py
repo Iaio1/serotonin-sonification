@@ -395,7 +395,13 @@ class FindAmplitude(Processor):
                   f"decay={selected_metadata['decay_time_sec']:.1f}s")
         else:
             print("No valid peaks found with adaptive validation.")
-            # Fallback logic here if needed
+            # NEW fallback here:
+            peak_position = np.argmax(fx)
+            peak_value = fx[peak_position]
+            print(f"Fallback peak at position: {peak_position} with value: {peak_value:.3f}")
+            if context is not None:
+                context['peak_amplitude_positions'] = peak_position
+                context['peak_amplitude_values'] = peak_value
 
         # Enhanced context with adaptive window information
         if context is not None and selected_metadata is not None:
