@@ -120,7 +120,9 @@ class ColorPlotPage(QWizardPage):
         left.addWidget(self.btn_save)
         left.addWidget(self.btn_export)
         left.addWidget(self.btn_export_all)
-        left.addWidget(QLabel("Peak Adjustment"))
+        peak_label = QLabel("Peak Adjustment")
+        peak_label.setStyleSheet("font-size: 10pt; font-weight: bold;")
+        left.addWidget(peak_label)
         left.addWidget(self.peak_slider)
         left.addWidget(self.btn_adj_peak)
 
