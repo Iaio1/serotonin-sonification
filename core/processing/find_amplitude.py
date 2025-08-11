@@ -340,6 +340,17 @@ class FindAmplitude(Processor):
                                        height=0.03,  # Slightly higher threshold
                                        width=3)  # Minimum width to avoid spikes
 
+        if len(peaks) == 0:
+            print("No peaks found in the initial detection.")
+            print("Using fallback logic to find peaks...")
+            # Fallback logic: use the maximum value as the peak
+            peak_position = np.argmax(fx)
+            peak_value = fx[peak_position]
+            print(f"Fallback peak at position: {peak_position} with value: {peak_value:.3f}")
+            context['peak_amplitude_positions'] = peak_position
+            context['peak_amplitude_values'] = peak_value
+            return data
+
         print(f"Initial peaks found: {len(peaks)}")
         print(f"Using adaptive time windows for validation")
 
