@@ -1,7 +1,7 @@
 from PyQt5.QtWidgets import (
-    QApplication, QComboBox, QWizardPage, QLabel, QPushButton, QVBoxLayout, QHBoxLayout, QDialog, QProgressDialog, QSlider
+    QApplication, QComboBox, QWizardPage, QLabel, QPushButton, QVBoxLayout, QHBoxLayout, QDialog, QProgressDialog, QSlider, QToolTip
 )
-from PyQt5.QtCore import QSettings, Qt
+from PyQt5.QtCore import QSettings, Qt, QEvent
 
 import os
 from core.output_manager import OutputManager
@@ -182,6 +182,7 @@ class ColorPlotPage(QWizardPage):
         Loads the list of replicates and associated files into combo boxes.
         Enables/disables UI components depending on available data.
         """
+        super().initializePage()
         # Default index
         def_index = 0
 
@@ -192,6 +193,12 @@ class ColorPlotPage(QWizardPage):
         self.cbo_rep.setCurrentIndex(def_index)
         self.cbo_rep.setEnabled(True)
 
+        # Grab the Next button from the wizard
+        next_btn = self.wizard().button(self.wizard().NextButton)
+        next_btn.setToolTip("Press 'Evaluate' to find peaks before continuing.")
+        next_btn.setAttribute(Qt.WA_AlwaysShowToolTips, True)  # show even if disabled
+        next_btn.installEventFilter(self)
+
         if not display_names_list:
             self.cbo_rep.setEnabled(False)
             self.cbo_file.clear()
@@ -200,6 +207,15 @@ class ColorPlotPage(QWizardPage):
         else:
             self._update_file_list_for_replicate(def_index)
             self.update_file_display()
+
+    def eventFilter(self, obj, event):
+        if obj is self.wizard().button(self.wizard().NextButton):
+            if event.type() == QEvent.ToolTip:
+                if not self.isComplete():  # Only show when Next is disabled
+                    QToolTip.showText(event.globalPos(),
+                                    "You need to press 'Evaluate' first to detect peaks.")
+                    return True  # block default
+        return super().eventFilter(obj, event)
 
     def _update_file_list_for_replicate(self, rep_index):
         """Update the file dropdown and mapping for a specific replicate."""
