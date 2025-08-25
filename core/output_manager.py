@@ -757,6 +757,62 @@ class OutputManager:
         save_path = os.path.join(output_folder, "plot_first_stim_amplitudes.png")
         group_analysis.plot_first_stim_amplitudes(save_path=save_path)
         
+    @staticmethod
+    def save_mean_ITs(group_experiments: GroupAnalysis, output_folder_path):
+        """
+        Save the mean IT trace for each file index across all experiments into a single CSV file.
+        Each column corresponds to a file index (e.g., timepoint), using the base filename from the first experiment.
+
+        Args:
+            group_experiments (GroupAnalysis): Group containing multiple experiments.
+            output_folder_path (str): Directory to save the output file.
+
+        Returns:
+            None
+        """
+        experiments = group_experiments.get_experiments()
+        if not experiments:
+            return None
+
+        file_count = experiments[0].get_file_count()
+        acq_freq = experiments[0].get_acquisition_frequency()
+        file_length = experiments[0].get_file_length()
+        n_timepoints = experiments[0].get_file_time_points()
+
+        # Get column headers from first experiment's file base names
+        base_names = [os.path.splitext(os.path.basename(sf.get_filepath()))[0] for sf in experiments[0].files]
+
+        # Collect ITs for each file index across experiments
+        mean_ITs = []
+        for file_idx in range(file_count):
+            # Gather ITs for this file index from all experiments
+            it_matrix = []
+            for exp in experiments:
+                IT_individual = exp.get_spheroid_file(file_idx).get_processed_data_IT()
+                it_matrix.append(IT_individual)
+            # Pad to same length if needed
+            max_len = max(len(it) for it in it_matrix)
+            it_matrix_padded = [np.pad(it, (0, max_len - len(it)), constant_values=np.nan) for it in it_matrix]
+            # Average across experiments (axis=0)
+            mean_IT = np.nanmean(it_matrix_padded, axis=0)
+            mean_ITs.append(mean_IT)
+
+        # Transpose so each column is a file index, each row is a timepoint
+        mean_ITs_array = np.array(mean_ITs).T  # shape: (n_timepoints, file_count)
+
+        # Create time axis in seconds
+        time_seconds = np.arange(mean_ITs_array.shape[0]) / acq_freq
+
+        # Build DataFrame
+        df = pd.DataFrame(mean_ITs_array, columns=base_names)
+        df.insert(0, "Time (s)", time_seconds)
+
+        # Save to CSV
+        output_folder = os.path.join(output_folder_path, "mean_ITs")
+        os.makedirs(output_folder, exist_ok=True)
+        output_path = os.path.join(output_folder, "Mean_ITs_across_experiments.csv")
+        df.to_csv(output_path, index=False)
+        print(f"Saved mean ITs across experiments to {output_path}")
 
 if __name__ == "__main__":
     # Example usage
