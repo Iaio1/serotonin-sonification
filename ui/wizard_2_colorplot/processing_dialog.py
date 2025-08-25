@@ -6,7 +6,7 @@ import json
 
 from ui.utils.styles import apply_custom_styles
 from ui.utils.ui_helpers import make_labeled_field_with_help
-from core.processing import BackgroundSubtraction, SavitzkyGolayFilter, RollingMean, GaussianSmoothing2D, ButterworthFilter, BaselineCorrection, Normalize, FindAmplitude, ExponentialFitting
+from core.processing import InvertData, BackgroundSubtraction, SavitzkyGolayFilter, RollingMean, GaussianSmoothing2D, ButterworthFilter, BaselineCorrection, Normalize, FindAmplitude, ExponentialFitting
 
 from core.processing.spontaneous_peak_detector import FindAmplitudeMultiple
 
@@ -37,6 +37,7 @@ class ProcessingOptionsDialog(QDialog):
             ("Savitzky-Golay Filter", False),
             ("Baseline Correction", True),
             ("Normalize", True),
+            ("Invert Data", False),  # Now enabled, but unchecked by default
             ("Find Amplitude", True),
             #("Multiple Peak Detection", False),  # New option
         ]
@@ -58,6 +59,7 @@ class ProcessingOptionsDialog(QDialog):
             "Savitzky-Golay Filter": "Fits a local polynomial of a given 'order' over each segment of the data to smooth noise. The 'window size' sets how many points are used per fit, while 'order' (the 'p' polynomial order) controls how closely the fit can follow rapid changes.",
             "Baseline Correction": "Removes baseline drift from the signal.",
             "Normalize": "Normalizes each trace based on the peak amplitude of the first file within each replicate.",
+            "Invert Data": "Inverts the sign of all data points. Use if your data is 'upside down' and you need to flip it.",
             #"Multiple Peak Detection": "Detects multiple spontaneous peaks throughout the signal using adaptive validation windows. Useful for analyzing spontaneous activity patterns.",
         }
 
@@ -196,6 +198,9 @@ class ProcessingOptionsDialog(QDialog):
                     "decay_window_sec": decay_edit
                 }
 
+            # For "Invert Data", no parameters, just a checkbox
+            # (No need to disable, just leave unchecked by default)
+
             # Add parameter widget to filter layout if it exists
             if param_widget:
                 filter_layout.addWidget(param_widget)
@@ -291,6 +296,8 @@ class ProcessingOptionsDialog(QDialog):
             return BaselineCorrection()
         elif name == "Normalize":
             return Normalize(peak_position)
+        elif name == "Invert Data":
+            return InvertData()
         elif name == "Find Amplitude":
             # Check file type to determine which amplitude finder to use
             settings = QSettings("HashemiLab", "NeuroStemVolt")
