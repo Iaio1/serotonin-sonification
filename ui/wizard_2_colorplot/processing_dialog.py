@@ -133,6 +133,34 @@ class ProcessingOptionsDialog(QDialog):
                 rm_container.hide()
                 param_widget = rm_container
                 self.param_widgets[name] = rm_window
+            elif name == "Butterworth Filter":
+                bw_layout = QHBoxLayout()
+                bw_label_p = QLabel("Order (p):")
+                bw_label_p.setStyleSheet("font-size: 11px; color: #555; margin-left: 16px;")
+                bw_p = QLineEdit("4")
+                bw_label_cx = QLabel("cx:")
+                bw_label_cx.setStyleSheet("font-size: 11px; color: #555;")
+                bw_cx = QLineEdit("0.75")
+                bw_label_cy = QLabel("cy:")
+                bw_label_cy.setStyleSheet("font-size: 11px; color: #555;")
+                bw_cy = QLineEdit("37500.0")
+                if "Butterworth Filter" in saved_params:
+                    p, cx, cy = saved_params["Butterworth Filter"]
+                    bw_p.setText(p)
+                    bw_cx.setText(cx)
+                    bw_cy.setText(cy)
+                bw_layout.addWidget(bw_label_p)
+                bw_layout.addWidget(bw_p)
+                bw_layout.addWidget(bw_label_cx)
+                bw_layout.addWidget(bw_cx)
+                bw_layout.addWidget(bw_label_cy)
+                bw_layout.addWidget(bw_cy)
+                bw_container = QWidget()
+                bw_container.setLayout(bw_layout)
+                bw_container.setContentsMargins(24, 0, 0, 0)  # Indent
+                bw_container.hide()
+                param_widget = bw_container
+                self.param_widgets[name] = (bw_p, bw_cx, bw_cy)
 
             # Add parameter widget to filter layout if it exists
             if param_widget:
@@ -195,7 +223,14 @@ class ProcessingOptionsDialog(QDialog):
         elif name == "Gaussian Smoothing 2D":
             return GaussianSmoothing2D()
         elif name == "Butterworth Filter":
-            return ButterworthFilter()
+            bw_p, bw_cx, bw_cy = self.param_widgets[name]
+            try:
+                p = int(bw_p.text())
+                cx = float(bw_cx.text())
+                cy = float(bw_cy.text())
+            except ValueError:
+                p, cx, cy = 4, 0.75, 37500.0
+            return ButterworthFilter(p=p, cx=cx, cy=cy)
         elif name == "Baseline Correction":
             return BaselineCorrection()
         elif name == "Normalize":
