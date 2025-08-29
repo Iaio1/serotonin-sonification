@@ -55,7 +55,7 @@ class ProcessingOptionsDialog(QDialog):
         help_texts = {
             "Background Subtraction": "Subtracts baseline offset by averaging the signal between a specified 'start' and 'end' segment (given as data indices or time points at the beginning of the trace) and subtracting that mean from the entire recording.",
             "Rolling Mean": "Smooths the trace by computing a moving average over a sliding window of N points. The 'window size' parameter sets how many consecutive samples are included in each average. Larger windows yield smoother traces but can blur sharp features.",
-            "Butterworth Filter": "Applies a low-pass filter while preserving waveform.",
+            "Butterworth Filter": "Applies a low-pass filter while preserving waveform. The 'order' (p) controls the steepness of the filter roll-off, while 'cx' and 'cy' set the cutoff frequencies (Hz) in the time and voltage dimensions, respectively.",
             "Savitzky-Golay Filter": "Fits a local polynomial of a given 'order' over each segment of the data to smooth noise. The 'window size' sets how many points are used per fit, while 'order' (the 'p' polynomial order) controls how closely the fit can follow rapid changes.",
             "Baseline Correction": "Removes baseline drift from the signal.",
             "Normalize": "Normalizes each trace based on the peak amplitude of the first file within each replicate.",
@@ -207,7 +207,7 @@ class ProcessingOptionsDialog(QDialog):
                 bw_p = QLineEdit("4")
                 bw_label_cx = QLabel("cx:")
                 bw_label_cx.setStyleSheet("font-size: 11px; color: #555;")
-                bw_cx = QLineEdit("0.75")
+                bw_cx = QLineEdit("2.5")
                 bw_label_cy = QLabel("cy:")
                 bw_label_cy.setStyleSheet("font-size: 11px; color: #555;")
                 bw_cy = QLineEdit("37500.0")
