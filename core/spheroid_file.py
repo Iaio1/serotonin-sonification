@@ -85,7 +85,7 @@ class SpheroidFile:
     def apply_calibration(self, slope, intercept):
         #print("Applying slope and intercept")
         #print(slope, intercept)
-        self.calibrated_data = self.raw_data * slope + intercept
+        self.calibrated_data = (self.raw_data - intercept )/ slope
         self.processed_data = self.calibrated_data  # Reset processed to calibrated
 
     def set_processed_data_as_original(self):
