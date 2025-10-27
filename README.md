@@ -1,122 +1,60 @@
-<p align="center">
-  <img src="https://github.com/user-attachments/assets/06242e82-c960-4d6b-a0eb-0c749dd6590f" alt="NeuroStemVolt Logo" width="500"/>
-</p>
+# **The Sound of Serotonin**
 
+### Background
+Fast-Scan Cyclic Voltammetry (FSCV) is a bioelectrochemical technique widely regarded as both technically and conceptually challenging. It allows the measurement of spontaneous serotonin release from various cell types, including skin cells [^1], gut cells [^2], and mice serotonergic neurons [^3], and more recently, from human stem cell–derived serotonergic neurons [^4].
 
-# **NeuroStemVolt**
+**Sonification** refers to the use of non-speech audio to convey information ([Sonification Handbook](https://sonification.de/handbook/)). By converting data relationships into acoustic signals, sonification can enhance communication and facilitate intuitive understanding of complex data patterns. 
 
-**NeuroStemVolt** is a user-friendly analysis tool with a graphical interface for processing **fast-scan cyclic voltammetry (FSCV)** data from **iPSC-derived neuronal spheroids**.  
-It enables in-depth analysis of:
-
-- Spontaneous neurotransmitter release  
-- Neuronal excitability  
-- Transporter kinetics  
-- Drug response dynamics over time
-
-Whether you're characterizing iPSC-derived neuronal systems or investigating neurotransmission under pharmacological conditions, **NeuroStemVolt** offers streamlined and flexible analysis workflows that adapt to a wide range of experimental setups in modern neurophysiological research.
+While several efforts have been made to improve the accessibility and outreach of FSCV data, the use of sonification as an interpretive or outreach tool has not yet been explored.
 
 ---
-
-## **Key Features**
-
-### **Data Pre-processing**
-- Interactive color plots and current-vs-time traces  
-- Multiple filtering options:
-  - Baseline correction 
-  - Background subtraction, 
-  - Rolling mean, 
-  - Butterworth filtering 
-  - Savitzky-Golay
-  - Normalization.
-- Visualization of raw vs. filtered data
-
-### **Spontaneous Activity Detection**
-- Detection and quantification of spontaneous neurotransmitter release events  
-- Peak detection algorithms
-
-### **Neuronal Excitability Analysis**
-- Analysis of stimulus-evoked release amplitudes  
-- Assessment of neuronal responsiveness
-
-### **Transporter Kinetics Evaluation**
-- Quantification of reuptake kinetics  
-- Inference of neurotransmitter transporter activity
-
-### **Drug Response Analysis**
-- Comparison of release amplitude and clearance rates  
-- Across time series of measurements
-
-### **Export Tools**
-- Export processed and annotated results to `.csv` format  
-- Ideal for downstream statistical analysis and sharing
-
-### **Graphical User Interface (GUI)**
-- No coding required  
-- Intuitive workflows for:
-  - Analysis setup  
-  - Filtering  
-  - Visualization  
-  - Export  
-- Built-in support for batch processing
+### Project Aim
+This project aims to transform pre-existing spontaneous FSCV datasets collected by the lab into musical representations, building upon the previously developed [NeuroStemVolt](https://github.com/pablopriet/NeuroStemVolt) software. The goal is to design a **mapping strategy (processing pipeline)** that converts serotonin driven electrical activity into sound or music.
 
 ---
+### Objectives
+The students will:
 
-## **Input Format**
-
-- **Supported Input:** `.txt` files containing color plot data (one per timepoint), formatted as tab- or space-separated values.
-- **How to Prepare Data:** Place all files for a replicate in a single folder.  
-- **Formatting Guidance:** See the `example_data` folder for sample file structure and formatting tips.
-
----
-
-## **Applications**
-
-- Functional characterization of iPSC-derived neuronal spheroids
-- Analysis of neurotransmitter release and reuptake under pharmacological manipulation
-- Drug screening, dose-response profiling, and transporter kinetics studies
-- Exploratory research in neurochemical signaling and synaptic physiology
-
----
-
-## **Output**
-
-**CSV Exports:**
-- Filtered and processed current-vs-time traces for each replicate and timepoint
-- Detected peak events with timestamps and amplitudes
-- Reuptake curve parameters, including decay constants and fit statistics
-
-**Visualizations:**
-- Interactive color plots for each timepoint
-- Current-vs-time traces with event annotations
-- Summary plots for batch analysis and group
+1. **Organize and preprocess** spontaneous serotonin release time-series data.  
+2. **Develop software tools** (in Python) extending the *NeuroStemVolt* framework.  
+3. **Design an interactive user interface (UI)** that allows flexible mapping of data parameters to musical variables, such as:  
+   - Pitch  
+   - Loudness  
+   - Timbre  
+   - Spatialization  
+4. **Generate playable MIDI files** by converting binned FSCV data from various cell types, including:  
+   - Skin cells [^1]  
+   - Gut cells [^2]  
+   - Mouse serotonergic neurons [^3]  
+   - Human stem cell–derived serotonergic neurons [^4]  
+1. **Integrate the resulting MIDI files** into a Digital Audio Workstation (DAW), e.g. Ableton, Logic, or Reaper, to experiment with instruments, effects, and spatialization.
 
 ---
+### Expected Outcomes
+The resulting software will enable users to transform bioelectric serotonin data into expressive musical compositions. Ideally, combining different types of cell releasing patterns into a single composition.
+The MIDI outputs can be used creatively in performance or education settings, serving as both scientific visualization and artistic expression.
 
-## **Executables (No Python Installation Required)**
+---
+### Dissemination & Impact
+The work produced in this project is expected to lead to:
 
-Pre-built executables are available for macOS and Unix-based systems.  
-These versions run without requiring any Python installation or environment setup.
+- A **research publication** detailing the methodology and creative process.  
+- A **presentation at** *The Great Exhibition Road Festival*.  
+- Potential **outreach applications** for public engagement, particularly in schools, raising awareness about depression, neuroscience, and bioelectrochemistry.
 
-You can download them here:  
-[**NeuroStemVolt v1.0.0 – Release Assets**](https://github.com/pablopriet/NeuroStemVolt/releases/tag/v1.0.0)
+--- 
+**Additional Resources**  
+- [Sonification Handbook](https://sonification.de/handbook/)  
+- [NeuroStemVolt Software Repository](https://github.com/pablopriet/NeuroStemVolt)
 
-### Included in the ZIP:
-- `.app` – macOS application bundle
-- Unix executable – for Linux or macOS terminal use
+[^1]: **Skin cells** – T.A. et al., *British Journal of Dermatology*, 190(6):e88, 2024. [https://academic.oup.com/bjd/article/190/6/e88/7675825](https://academic.oup.com/bjd/article/190/6/e88/7675825)
 
-**Usage:**
-1. Download and unzip the file for your operating system.
-2. On macOS:
-   - Double-click the `.app` to launch the GUI.
-   - If you get a security warning, go to **System Preferences → Security & Privacy** and allow the app.
-3. On Unix/Linux:
-   - Open a terminal in the extracted folder.
-   - Run:  
-     ```bash
-     ./NeuroStemVolt
-     ```
+[^2]: **Gut cells** – B.B. et al., *Analytical Chemistry*, 97(8):12345–12356, 2024. [https://pubs.acs.org/doi/full/10.1021/acs.analchem.4c06033](https://pubs.acs.org/doi/full/10.1021/acs.analchem.4c06033)
 
-Windows executables will be provided in a future release.
+[^3]: **Mouse serotonergic neurons** – P.H. et al., *Analytical Chemistry*, 81(17):7046–7055, 2009. [https://pubs.acs.org/doi/abs/10.1021/ac9018846](https://pubs.acs.org/doi/abs/10.1021/ac9018846)
+
+[^4]: **Human stem cell–derived serotonergic neurons** – B. B et al., SSRN preprint, 2025. [https://papers.ssrn.com/sol3/papers.cfm?abstract_id=5390878](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=5390878)
+
 
 ---
 
@@ -147,13 +85,15 @@ Minimal environment (see `environment.yml`):
 ## License
 
 [MIT License](LICENSE)  
-© 2025 Hashemi Lab · NeuroStemVolt
 
 ---
 
 ## Acknowledgements
 
-Developed by **Pablo Prieto Roca** and Tomas Andriuskevicius @[Hashemi Lab](https://www.hashemilab.com/).  
-For questions or support, contact [pablo.prieto-roca23@imperial.ac.uk].
+Developed by...
+For questions or support, contact ...
+
+### References
+
 
 
