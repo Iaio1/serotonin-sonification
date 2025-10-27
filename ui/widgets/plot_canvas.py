@@ -399,7 +399,9 @@ class PlotCanvas(FigureCanvas):
 
         # 7) labels & styling
         self.axes.set_xlabel('Time (seconds)', fontsize=12)
-        self.axes.set_ylabel('Current (nA)', fontsize=12)
+        calibration_enabled = settings.value("calibration_enabled", False, type=bool)
+        #self.axes.set_ylabel('Current (nA)', fontsize=12)
+        self.axes.set_ylabel("Peak Concentration (nM)" if calibration_enabled else "Peak Amplitude (nA)")
         self.axes.set_title('Post-peak IT decays & exponential fit', fontsize=14)
         self.axes.legend(frameon=False)
         self.axes.grid(False)
