@@ -72,19 +72,12 @@ class ButterworthFilter(Processor):
         # 6. Inverse FFT to return to spatial domain
         filtered = np.fft.ifft2(np.fft.ifftshift(F_filtered)).real
 
-        # 7. Crop to original size (remove padding)
+        # 7. REMOVED PADDING TO CROP TO ORIGINAL SIZE
         ys = slice(pad_y, -pad_y) if pad_y > 0 else slice(None)
         xs = slice(pad_x, -pad_x) if pad_x > 0 else slice(None)
         filtered_cropped = filtered[ys, xs]
         #self.visualize_cutoff(data)
         
-        
-        print("Butterworth:",
-              "in", data.shape,
-              "pad", (pad_y, pad_x),
-              "padded", padded_data.shape,
-              "out", filtered_cropped.shape)
-
         return filtered_cropped
     
 
