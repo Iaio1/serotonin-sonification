@@ -7,8 +7,3 @@
     <orderEntry type="jdk" jdkName="Python 3.11 (serotonin-sonification) (3)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
   </component>
-  <component name="PyDocumentationSettings">
-    <option name="format" value="PLAIN" />
-    <option name="myDocStringFormat" value="Plain" />
-  </component>
-</module>
