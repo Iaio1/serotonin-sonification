@@ -68,17 +68,25 @@ class ButterworthFilter(Processor):
 
         # 5. Apply transfer function in frequency domain
         F_filtered = F_shifted * H
-
         # 6. Inverse FFT to return to spatial domain
         filtered = np.fft.ifft2(np.fft.ifftshift(F_filtered)).real
 
         # 7. Crop to original size (remove padding)
-        filtered_cropped = filtered[pad_y:-pad_y, pad_x:-pad_x]
-
+        ys = slice(pad_y, -pad_y) if pad_y > 0 else slice(None)
+        xs = slice(pad_x, -pad_x) if pad_x > 0 else slice(None)
+        filtered_cropped = filtered[ys, xs]
         #self.visualize_cutoff(data)
+        
+        
+        print("Butterworth:",
+              "in", data.shape,
+              "pad", (pad_y, pad_x),
+              "padded", padded_data.shape,
+              "out", filtered_cropped.shape)
 
         return filtered_cropped
-    
+
+
     def visualize_cutoff(self, data):
         """
         This visualization function plots the 2D FFT magnitude spectrum of the input data with an overlaid Butterworth cutoff region.
