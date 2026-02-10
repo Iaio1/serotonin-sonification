@@ -16,6 +16,8 @@ def main():
     and loads the multi-page wizard interface for processing FSCV replicates.
     """
     # Enable high DPI to show loading image in high quality
+    print("### APP STARTED: build =", __import__("datetime").datetime.now())
+
     QApplication.setAttribute(Qt.AA_EnableHighDpiScaling, True)
     QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps, True)
     
