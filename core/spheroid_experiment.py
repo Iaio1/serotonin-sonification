@@ -5,7 +5,7 @@ from core.processing.rolling_mean import RollingMean
 from core.processing.butterworth import ButterworthFilter
 from core.processing.gaussian import GaussianSmoothing2D
 from core.processing.baseline_correct import BaselineCorrection
-#from core.processing.find_amplitude import FindAmplitude
+from core.processing.find_amplitude import FindAmplitude
 from core.processing.normalize import Normalize
 from core.processing.sav_gol import SavitzkyGolayFilter
 from core.processing.background_subtraction import BackgroundSubtraction
@@ -68,7 +68,7 @@ class SpheroidExperiment:
         self.file_type = file_type
 
         # Initialize processors after acquisition_frequency is set
-       """ if processors is None:
+        if processors is None:
             # Choose the appropriate amplitude finder based on file type
             if file_type == "Spontaneous":
                 from core.processing.spontaneous_peak_detector import FindAmplitudeMultiple
@@ -96,9 +96,9 @@ class SpheroidExperiment:
             "pulses": 50
         }
 
-        self.set_peak_position(peak_position)"""
+        self.set_peak_position(peak_position)
 
-    """def set_peak_position(self, peak_position):
+    def set_peak_position(self, peak_position):
         """
         Set peak detection index for all files in this experiment.
 
@@ -106,7 +106,7 @@ class SpheroidExperiment:
             peak_position (int): Sample index of expected peak.
 
         Returns:
-            None"""
+            None
         """
         for f in self.files:
             f.set_peak_position(peak_position)
