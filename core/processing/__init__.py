@@ -1,6 +1,6 @@
 from .raw_mean import RawMean
 from .baseline_correct import BaselineCorrection
-from .find_amplitude import FindAmplitude
+#from .find_amplitude import FindAmplitude
 from .gaussian import GaussianSmoothing2D
 from .sav_gol import SavitzkyGolayFilter
 from .butterworth import ButterworthFilter
