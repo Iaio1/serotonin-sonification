@@ -64,7 +64,7 @@ class ButterworthFilter(Processor):
 
         #print(f"Cutoff frequencies: cx={cx}, cy={cy}") -> cx=0.75, cy=37500.0
         # 4. Compute the custom 2D Butterworth transfer function
-        H = 1 / 1 + ((WX / self.cx)**(2) + (WY / self.cy)**(2))**self.p
+        H = 1 / (1 + (WX / self.cx)**(2) + (WY / self.cy)**(2))**self.p
 
         # 5. Apply transfer function in frequency domain
         F_filtered = F_shifted * H
