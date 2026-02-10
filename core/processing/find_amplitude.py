@@ -1,4 +1,4 @@
-from .base import Processor
+"""from .base import Processor
 import numpy as np
 from scipy.signal import find_peaks
 from PyQt5.QtCore import QSettings
@@ -475,3 +475,4 @@ class FindAmplitude(Processor):
 #                 alpha *= 0.5
 
 #         return x_current, f_interp(x_current)
+"""
