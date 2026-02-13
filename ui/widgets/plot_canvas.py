@@ -122,50 +122,52 @@ class PlotCanvas(FigureCanvas):
 
         # Plot peak markers if metadata is provided
         if metadata and 'peak_amplitude_positions' in metadata:
-            print("IN PLOT CANVAS")
-            print(metadata)
-            peak_indices = metadata['peak_amplitude_positions']
-            peak_values = metadata.get('peak_amplitude_values', None)
+            peak_indices = metadata.get('peak_amplitude_positions', [])
 
-            # Handle multiple peaks (list/array)
-            if isinstance(peak_indices, (list, np.ndarray)) and len(peak_indices) > 0:
-                # Multiple peaks detected
-                if peak_values is None:
-                    peak_values = [profile[idx] for idx in peak_indices if 0 <= idx < len(profile)]
-
-                # Plot all peaks with different colors or numbering
-                colors = ['#FF3877', '#FF8C00', '#32CD32', '#9370DB', '#FF69B4', '#00CED1', '#FFD700', '#DC143C', '#00FF7F',
-                          '#FF1493']
-
-                for i, (idx, val) in enumerate(zip(peak_indices, peak_values)):
-                    if 0 <= idx < len(profile):
-                        color = colors[i % len(colors)]  # Cycle through colors
-                        self.axes.scatter(t[idx], val, color=color, s=100, zorder=5,
-                                          label=f'Peak {i + 1}' if i < 5 else None)  # Limit legend entries
-
-                        # Annotate with peak number and value
-                        self.axes.annotate(f"P{i + 1}: {val:.2f}", (t[idx], val),
-                                           textcoords="offset points", xytext=(0, 15),
-                                           ha='center', fontsize=8, color=color, fontweight='bold')
-
-                    # Add summary text
-                    num_peaks = len(peak_indices)
-                    self.axes.text(0.02, 0.98, f"Detected {num_peaks} peaks",
-                                   transform=self.axes.transAxes, fontsize=10,
-                                   verticalalignment='top', bbox=dict(boxstyle='round',
-                                                                      facecolor='wheat', alpha=0.8))
-
+            # Normalize to a list of ints
+            if peak_indices is None:
+                peak_idx_list = []
+            elif isinstance(peak_indices, (list, tuple, np.ndarray)):
+                peak_idx_list = [int(p) for p in peak_indices]
             else:
-                # Single peak (backward compatibility)
-                try:
-                    idx = int(peak_indices) if not isinstance(peak_indices, (list, np.ndarray)) else peak_indices[0]
-                    val = float(peak_values) if not isinstance(peak_values, (list, np.ndarray)) else peak_values[0]
-                    if 0 <= idx < len(profile):
-                        self.axes.scatter(t[idx], val, color='#FF3877', s=100, alpha=0.5, zorder=5, label='Current Peak')
-                        self.axes.annotate(f"{val:.2f}", (t[idx], val), textcoords="offset points",
-                                           xytext=(0, 10), ha='center', fontsize=9, color='#FF3877')
-                except (ValueError, TypeError, IndexError):
-                    pass
+                # scalar case
+                peak_idx_list = [int(peak_indices)]
+
+            # Keep only valid indices
+            peak_idx_list = [p for p in peak_idx_list if 0 <= p < len(profile)]
+
+            if len(peak_idx_list) > 0:
+                # Plot all peaks on the RAW profile so dots sit on the curve
+                colors = ['#FF3877', '#FF8C00', '#32CD32', '#9370DB', '#00CED1',
+                          '#FFD700', '#DC143C', '#00FF7F', '#FF1493', '#8A2BE2']
+
+                for i, idx in enumerate(peak_idx_list):
+                    c = colors[i % len(colors)]
+                    self.axes.scatter(t[idx], profile[idx], color=c, s=100, zorder=5,
+                                      label=(f'Peak {i + 1}' if i < 5 else None))
+
+                    # optional annotation (keep it light)
+                    if i < 5:
+                        self.axes.annotate(
+                            f"{profile[idx]:.2f}",
+                            (t[idx], profile[idx]),
+                            textcoords="offset points",
+                            xytext=(0, 12),
+                            ha='center',
+                            fontsize=8,
+                            color=c,
+                            fontweight='bold'
+                        )
+
+                # Summary box
+                self.axes.text(
+                    0.02, 0.98,
+                    f"Detected {len(peak_idx_list)} peaks",
+                    transform=self.axes.transAxes,
+                    fontsize=10,
+                    verticalalignment='top',
+                    bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8)
+                )
 
             # Plot temporary peak detection position (preview from slider)
             if temp_peak_detection is not None and 0 <= temp_peak_detection < len(profile):

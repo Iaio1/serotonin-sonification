@@ -464,16 +464,20 @@ class ColorPlotPage(QWizardPage):
         progress.show()
         QApplication.processEvents()
 
-        # Choose the appropriate amplitude finder based on file type
-        if file_type == "Spontaneous":
+        # Choose the appropriate amplitude finder based on file type (robust to case/whitespace)
+        ft = (file_type or "").strip().lower()
+        print(">>> file_type raw =", repr(file_type), "normalized =", repr(ft))
+
+        if ft == "spontaneous":
+            print(">>> Using FindAmplitudeMultiple")
             mandatory = FindAmplitudeMultiple(peak_pos)
         else:
-            print("Using default amplitude finder______________")
+            print(">>> Using FindAmplitude (single peak)")
             mandatory = FindAmplitude(peak_pos)
 
         # Keep all user processors EXCEPT any existing amplitude finders
         user_processors = self.selected_processors or []
-        processors = [p for p in user_processors if not isinstance(p, (FindAmplitude))]
+        processors = [p for p in user_processors if not isinstance(p, (FindAmplitude, FindAmplitudeMultiple))]
 
         # Add the mandatory amplitude finder
         processors.append(mandatory)
@@ -524,16 +528,24 @@ class ColorPlotPage(QWizardPage):
                 sf = exp.get_spheroid_file(f_idx)
                 md = sf.get_metadata() or {}
                 pos = md.get("peak_amplitude_positions")
-                # treat None or NaN as missing
+
+                # Missing if None
                 if pos is None:
                     missing.append((r_idx, f_idx))
-                else:
-                    try:
-                        import math
-                        if isinstance(pos, float) and math.isnan(pos):
-                            missing.append((r_idx, f_idx))
-                    except Exception:
-                        pass
+                    continue
+
+                # Missing if empty list
+                if isinstance(pos, (list, tuple)) and len(pos) == 0:
+                    missing.append((r_idx, f_idx))
+                    continue
+
+                # Missing if NaN scalar
+                try:
+                    import math
+                    if isinstance(pos, float) and math.isnan(pos):
+                        missing.append((r_idx, f_idx))
+                except Exception:
+                    pass
         return missing
 
     def isComplete(self):

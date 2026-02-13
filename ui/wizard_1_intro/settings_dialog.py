@@ -50,7 +50,7 @@ class ExperimentSettingsDialog(QDialog):
         #self.cb_waveform    = QComboBox();  self.cb_waveform.addItems(["5HT","Else"])
         #self.cb_waveform.setCurrentText(defaults["waveform"]);                     form.addRow("Waveform:", self.cb_waveform)
 
-        self.cb_file_type = QComboBox(); self.cb_file_type.addItems(["None","Stimulation"])
+        self.cb_file_type = QComboBox(); self.cb_file_type.addItems(["None","Stimulation","Spontaneous"])
         self.cb_file_type.setCurrentText(defaults["file_type"]);                   form.addRow("File Type:", self.cb_file_type)
 
         self.le_acq_freq = QLineEdit(str(defaults["acquisition_frequency"]))  

@@ -235,119 +235,201 @@ class FindAmplitudeMultiple(Processor):
             return False
 
     def process(self, data, context=None):
-        """
-        Enhanced process method for multiple peak detection in spontaneous signals.
-        """
-        settings = QSettings("HashemiLab", "NeuroStemVolt")
-        freq = settings.value("acquisition_frequency", 10, type=int)
+            """
+            Robust multi-peak detection on the I–T profile using:
+            smoothing + drift removal + MAD noise + hysteresis segmentation.
+            Stores per-peak dictionaries in context['spontaneous_peaks'].
+            """
+            from PyQt5.QtCore import QSettings
+            import numpy as np
 
-        fx = data[:, self.peak_position]
+            print(">>> FindAmplitudeMultiple RUNNING", data.shape, "peak_position", self.peak_position)
 
-        # More sensitive initial peak detection for spontaneous signals
-        peaks, properties = find_peaks(fx,
-                                       prominence=self.min_prominence,  # Lower threshold
-                                       distance=max(5, freq // 2),      # 0.5 second minimum distance
-                                       height=0.02,                     # Lower height threshold
-                                       width=2)                         # Narrower minimum width
+            settings = QSettings("HashemiLab", "NeuroStemVolt")
+            freq = settings.value("acquisition_frequency", 10, type=int)
 
-        print(f"Initial peaks found for spontaneous analysis: {len(peaks)}")
+            # 1) Extract I–T profile
+            fx = np.asarray(data[:, self.peak_position], dtype=float)
+            n = fx.size
+            if n < 10:
+                if context is not None:
+                    context["spontaneous_peaks"] = []
+                    context["num_peaks_detected"] = 0
+                return data
 
-        # Validate all peaks
-        valid_peaks = []
-        valid_values = []
-        peak_metadata = []
+            # ---- Tunable parameters (good defaults for your traces) ----
+            smooth_sec = 0.7  # light smoothing
+            baseline_sec = 15.0  # drift window
+            k_enter = 3.5  # enter threshold = k_enter * sigma (3–4 is typical)
+            k_exit = 2.0  # exit threshold  = k_exit  * sigma
+            min_width_sec = 0.25
+            min_gap_sec = 0.4
+            polarity = "both"  # handles inverted peaks too
+            # -----------------------------------------------------------
 
-        for peak_idx in peaks:
-            peak_val = fx[peak_idx]
+            # 2) Smooth (Savitzky–Golay if possible; fallback to moving average)
+            try:
+                from scipy.signal import savgol_filter
+                w = max(5, int(round(smooth_sec * freq)))
+                if w % 2 == 0:
+                    w += 1
+                w = min(w, n if n % 2 == 1 else n - 1)
+                fx_s = savgol_filter(fx, window_length=w, polyorder=3, mode="interp")
+            except Exception:
+                w = max(3, int(round(smooth_sec * freq)))
+                kernel = np.ones(w) / w
+                fx_s = np.convolve(fx, kernel, mode="same")
 
-            is_valid, window_info = self._validate_peak_with_adaptive_windows(fx, peak_idx, freq)
+            # 3) Remove drift baseline (rolling median; robust to steps)
+            try:
+                import pandas as pd
+                bw = max(5, int(round(baseline_sec * freq)))
+                if bw % 2 == 0:
+                    bw += 1
+                baseline = (
+                    pd.Series(fx_s)
+                    .rolling(window=bw, center=True, min_periods=1)
+                    .median()
+                    .to_numpy()
+                )
+            except Exception:
+                # Fallback: median filter
+                from scipy.signal import medfilt
+                bw = max(5, int(round(baseline_sec * freq)))
+                if bw % 2 == 0:
+                    bw += 1
+                baseline = medfilt(fx_s, kernel_size=bw)
 
-            if is_valid:
-                valid_peaks.append(peak_idx)
-                valid_values.append(peak_val)
-                peak_metadata.append(window_info)
-                print(f"Valid spontaneous peak: idx={peak_idx}, val={peak_val:.3f}, "
-                      f"rise={window_info['rise_time_sec']:.1f}s, "
-                      f"decay={window_info['decay_time_sec']:.1f}s")
+            resid = fx_s - baseline
 
-        # Sort by amplitude and take top peaks
-        if len(valid_peaks) > 0:
-            # Sort by amplitude (descending)
-            sorted_indices = np.argsort(valid_values)[::-1]
-            
-            # Limit to max_peaks
-            num_peaks_to_keep = min(self.max_peaks, len(valid_peaks))
-            
-            final_peaks = [valid_peaks[i] for i in sorted_indices[:num_peaks_to_keep]]
-            final_values = [valid_values[i] for i in sorted_indices[:num_peaks_to_keep]]
-            final_metadata = [peak_metadata[i] for i in sorted_indices[:num_peaks_to_keep]]
-            
-            # Sort by time (position) for final output
-            time_sorted_indices = np.argsort(final_peaks)
-            final_peaks = [final_peaks[i] for i in time_sorted_indices]
-            final_values = [final_values[i] for i in time_sorted_indices]
-            final_metadata = [final_metadata[i] for i in time_sorted_indices]
+            # Polarity handling (some traces may be inverted)
+            if polarity == "negative":
+                resid_use = -resid
+            elif polarity == "both":
+                # pick the stronger side automatically
+                resid_use = resid if np.nanmax(resid) >= abs(np.nanmin(resid)) else -resid
+            else:
+                resid_use = resid
 
-            print(f"Found {len(final_peaks)} valid spontaneous peaks")
-            for i, (pos, val) in enumerate(zip(final_peaks, final_values)):
-                print(f"  Peak {i+1}: position={pos} (time={pos/freq:.1f}s), amplitude={val:.3f}")
+            # 4) Robust noise sigma (MAD) estimated from the "quiet" part (avoids peaks inflating sigma)
+            abs_r = np.abs(resid_use)
+            quiet = abs_r <= np.quantile(abs_r, 0.7)  # lowest 70% magnitude = mostly noise
+            r0 = resid_use[quiet] if np.any(quiet) else resid_use
 
-        else:
-            final_peaks = []
-            final_values = []
-            final_metadata = []
-            print("No valid spontaneous peaks found.")
+            med = np.median(r0)
+            mad = np.median(np.abs(r0 - med))
+            sigma = 1.4826 * mad if mad > 1e-12 else (np.std(r0) + 1e-12)
 
-        # Update context for multiple peaks
-        if context is not None:
-            context['peak_amplitude_positions'] = final_peaks
-            context['peak_amplitude_values'] = final_values
-            context['num_peaks_detected'] = len(final_peaks)
-            
-            # Store metadata for all peaks
-            context['all_peak_metadata'] = final_metadata
-            
-            # For backwards compatibility, store the highest amplitude peak as primary
-            if len(final_peaks) > 0:
-                # Find the peak with highest amplitude
-                max_amp_idx = np.argmax(final_values)
-                context['primary_peak_position'] = final_peaks[max_amp_idx]
-                context['primary_peak_value'] = final_values[max_amp_idx]
-                
-                # Store primary peak's decay regions
-                primary_metadata = final_metadata[max_amp_idx]
-                peak_position = final_peaks[max_amp_idx]
-                
-                rise_samples = primary_metadata['rise_window_samples']
-                decay_samples = primary_metadata['decay_window_samples']
+            enter_th = k_enter * sigma
+            exit_th = k_exit * sigma
 
-                left_start = max(0, peak_position - rise_samples)
-                context['decay_left_region'] = {
-                    'indices': list(range(left_start, peak_position)),
-                    'values': fx[left_start:peak_position].tolist(),
-                    'time_window_sec': primary_metadata['rise_time_sec'],
-                    'adaptive': True
+            print(f">>> sigma={sigma:.4g} enter_th={enter_th:.4g} exit_th={exit_th:.4g}")
+
+            min_width = max(1, int(round(min_width_sec * freq)))
+            min_gap = max(1, int(round(min_gap_sec * freq)))
+
+            # 5) Hysteresis segmentation
+            peaks = []
+            i = 0
+            while i < n:
+                if resid_use[i] >= enter_th:
+                    # expand left to exit threshold
+                    start = i
+                    while start > 0 and resid_use[start - 1] > exit_th:
+                        start -= 1
+                    # expand right to exit threshold
+                    end = i
+                    while end < n - 1 and resid_use[end + 1] > exit_th:
+                        end += 1
+
+                    # enforce minimum width
+                    if (end - start + 1) >= min_width:
+                        seg = resid_use[start:end + 1]
+                        peak_rel = int(np.argmax(seg))
+                        peak_idx = start + peak_rel
+                        amp = float(seg[peak_rel])
+
+                        # basic features already useful for music mapping
+                        # (AUC in "nA·s" if your axis is nA and x is seconds)
+                        auc = float(np.trapz(seg, dx=1.0 / freq))
+
+                        # FWHM (seconds)
+                        half = 0.5 * amp
+                        left = peak_idx
+                        while left > start and resid_use[left] >= half:
+                            left -= 1
+                        right = peak_idx
+                        while right < end and resid_use[right] >= half:
+                            right += 1
+                        fwhm_s = float((right - left) / freq)
+
+                        peaks.append({
+                            "start_idx": int(start),
+                            "peak_idx": int(peak_idx),
+                            "end_idx": int(end),
+                            "start_s": float(start / freq),
+                            "peak_s": float(peak_idx / freq),
+                            "end_s": float(end / freq),
+                            "amp": float(amp),  # baseline-removed amplitude
+                            "auc": float(auc),
+                            "fwhm_s": float(fwhm_s),
+                            "rise_s": float((peak_idx - start) / freq),
+                            "decay_s": float((end - peak_idx) / freq),
+                            "snr": float(amp / (sigma + 1e-12)),
+                        })
+
+                    i = end + 1
+                else:
+                    i += 1
+
+            # 6) Merge events that are too close (prevents double-counting in noisy traces)
+            if peaks:
+                merged = [peaks[0]]
+                for p in peaks[1:]:
+                    prev = merged[-1]
+                    if p["start_idx"] - prev["end_idx"] <= min_gap:
+                        # merge by extending end; keep the higher peak
+                        prev["end_idx"] = max(prev["end_idx"], p["end_idx"])
+                        prev["end_s"] = prev["end_idx"] / freq
+
+                        if p["amp"] > prev["amp"]:
+                            # replace peak location/features if new peak is larger
+                            for k in ["peak_idx", "peak_s", "amp", "auc", "fwhm_s", "rise_s", "decay_s", "snr"]:
+                                prev[k] = p[k]
+                    else:
+                        merged.append(p)
+                peaks = merged
+
+            print(">>> detected", len(peaks), "peaks at", [p["peak_idx"] for p in peaks])
+
+            # store results for UI / export / later sonification
+            if context is not None:
+                context["spontaneous_peaks"] = peaks
+                context["num_peaks_detected"] = len(peaks)
+                context["peak_detection_params"] = {
+                    "freq_hz": freq,
+                    "smooth_sec": smooth_sec,
+                    "baseline_sec": baseline_sec,
+                    "k_enter": k_enter,
+                    "k_exit": k_exit,
+                    "min_width_sec": min_width_sec,
+                    "min_gap_sec": min_gap_sec,
+                    "polarity": polarity,
+                    "sigma": float(sigma),
                 }
 
-                right_end = min(len(fx), peak_position + decay_samples + 1)
-                context['decay_right_region'] = {
-                    'indices': list(range(peak_position + 1, right_end)),
-                    'values': fx[peak_position + 1:right_end].tolist(),
-                    'time_window_sec': primary_metadata['decay_time_sec'],
-                    'adaptive': True
-                }
+                # Backwards compatibility with the rest of the app:
+                if peaks:
+                    # primary peak = max amplitude
+                    best = max(peaks, key=lambda d: d["amp"])
+                    context["primary_peak_position"] = best["peak_idx"]
+                    context["primary_peak_value"] = best["amp"]
+                    context["peak_amplitude_positions"] = [p["peak_idx"] for p in peaks]
+                    context["peak_amplitude_values"] = [p["amp"] for p in peaks]
+                else:
+                    context["primary_peak_position"] = None
+                    context["primary_peak_value"] = None
+                    context["peak_amplitude_positions"] = []
+                    context["peak_amplitude_values"] = []
 
-                context['decay_validation_params'] = {
-                    'adaptive_windows': True,
-                    'rise_window_sec': primary_metadata['rise_time_sec'],
-                    'decay_window_sec': primary_metadata['decay_time_sec'],
-                    'rise_window_samples': rise_samples,
-                    'decay_window_samples': decay_samples,
-                    'acquisition_frequency': freq,
-                    'peak_passed_validation': True,
-                    'validation_type': 'adaptive_spontaneous_multiple_peaks',
-                    'signal_type': 'spontaneous',
-                    'multiple_peaks': True
-                }
-
-        return data
+            return data
