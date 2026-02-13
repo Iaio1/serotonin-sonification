@@ -155,15 +155,19 @@ class IntroPage(QWizardPage):
         folder = QFileDialog.getExistingDirectory(self, "Select replicate folder")
         if not folder:
             return
-        
+
         # collect all .txt files in that folder
-        paths = [os.path.join(folder, f)
-                 for f in os.listdir(folder)
-                 if f.lower().endswith(".txt")]
+        txt_paths = [os.path.join(folder, f)
+                     for f in os.listdir(folder)
+                     if f.lower().endswith(".txt")]
+
+        # If the dataset contains paired files (e.g. *_COLOR.txt and *_IT.txt),
+        # keep only the *_COLOR.txt files by default.
+        color_paths = [p for p in txt_paths if os.path.basename(p).lower().endswith("_color.txt")]
+        paths = color_paths if color_paths else txt_paths
         if not paths:
-            # optional: warn “no .txt found”
             return
-        
+
         if self.number_of_files != 0 and self.number_of_files != len(paths):
             QMessageBox.warning(
                 self,
