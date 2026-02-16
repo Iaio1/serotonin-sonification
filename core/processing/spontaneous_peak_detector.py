@@ -267,18 +267,7 @@ class FindAmplitudeMultiple(Processor):
             polarity = "both"  # handles inverted peaks too
             # -----------------------------------------------------------
 
-            # 2) Smooth (Savitzky–Golay if possible; fallback to moving average)
-            try:
-                from scipy.signal import savgol_filter
-                w = max(5, int(round(smooth_sec * freq)))
-                if w % 2 == 0:
-                    w += 1
-                w = min(w, n if n % 2 == 1 else n - 1)
-                fx_s = savgol_filter(fx, window_length=w, polyorder=3, mode="interp")
-            except Exception:
-                w = max(3, int(round(smooth_sec * freq)))
-                kernel = np.ones(w) / w
-                fx_s = np.convolve(fx, kernel, mode="same")
+            fx_s = fx               
 
             # 3) Remove drift baseline (rolling median; robust to steps)
             try:
