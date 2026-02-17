@@ -1,5 +1,5 @@
 from PyQt5.QtWidgets import (
-    QApplication, QMessageBox, QComboBox, QWizardPage, QLabel, QPushButton, QVBoxLayout, QHBoxLayout, QDialog, QProgressDialog, QSlider, QToolTip
+    QApplication, QMessageBox, QFileDialog, QComboBox, QWizardPage, QLabel, QPushButton, QVBoxLayout, QHBoxLayout, QDialog, QProgressDialog, QSlider, QToolTip
 )
 from PyQt5.QtCore import QSettings, Qt, QEvent
 
@@ -14,6 +14,9 @@ from core.processing import *
 # Import both amplitude processors at module level
 from core.processing.find_amplitude import FindAmplitude
 from core.processing.spontaneous_peak_detector import FindAmplitudeMultiple
+
+from core.sonification.sonify_csv import sonify_from_folder
+from core.sonification.play_audio import play_wav
 
 import numpy as np
 import os
@@ -92,6 +95,9 @@ class ColorPlotPage(QWizardPage):
         self.btn_char_extract = QPushButton("Characteristic Extraction")
         apply_custom_styles(self.btn_char_extract)
         self.btn_char_extract.clicked.connect(self.export_peak_characteristics)
+        self.sonify_button = QPushButton("Sonify")
+        apply_custom_styles(self.sonify_button)
+        self.sonify_button.clicked.connect(self.on_sonify_clicked)
         self.btn_export_all = QPushButton("Export All ITs")
         apply_custom_styles(self.btn_export_all)
         self.btn_export_all.clicked.connect(self.save_all_ITs)
@@ -129,6 +135,7 @@ class ColorPlotPage(QWizardPage):
         left.addWidget(self.btn_save)
         left.addWidget(self.btn_export)
         left.addWidget(self.btn_char_extract)
+        left.addWidget(self.sonify_button)
         left.addWidget(self.btn_export_all)
         peak_label = QLabel("Peak Adjustment")
         peak_label.setStyleSheet("font-size: 10pt; font-weight: bold;")
@@ -679,3 +686,37 @@ class ColorPlotPage(QWizardPage):
         if not enabled:
             # also clear any temporary selection so nothing is drawn
             self.temp_peak = None
+            
+    def on_sonify_clicked(self):
+        try:
+            # Default to your configured output folder
+            settings = QSettings("HashemiLab", "NeuroStemVolt")
+            default_folder = settings.value("output_folder", "", type=str)
+    
+            # Let the user choose the folder containing the CSV
+            folder = QFileDialog.getExistingDirectory(
+                self,
+                "Select the folder containing peak_characteristics.csv",
+                default_folder or os.path.expanduser("~")
+            )
+            if not folder:
+                return
+    
+            # Use whatever replicate/file you are currently viewing
+            replicate = self.cbo_rep.currentText()
+            file_name = self.cbo_file.currentText()
+    
+            wav_path = sonify_from_folder(folder, replicate=replicate, file_name=file_name)
+
+            # PLAY THE AUDIO
+            play_wav(wav_path)
+            
+            QMessageBox.information(
+    self,
+    "Sonify",
+    f"Playing audio.\nSaved WAV:\n{wav_path}"
+)
+
+    
+        except Exception as e:
+            QMessageBox.critical(self, "Sonify failed", str(e))
