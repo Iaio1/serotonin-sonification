@@ -1,5 +1,5 @@
 from PyQt5.QtWidgets import (
-    QApplication, QComboBox, QWizardPage, QLabel, QPushButton, QVBoxLayout, QHBoxLayout, QDialog, QProgressDialog, QSlider, QToolTip
+    QApplication, QMessageBox, QFileDialog, QComboBox, QWizardPage, QLabel, QPushButton, QVBoxLayout, QHBoxLayout, QDialog, QProgressDialog, QSlider, QToolTip
 )
 from PyQt5.QtCore import QSettings, Qt, QEvent
 
@@ -14,6 +14,9 @@ from core.processing import *
 # Import both amplitude processors at module level
 from core.processing.find_amplitude import FindAmplitude
 from core.processing.spontaneous_peak_detector import FindAmplitudeMultiple
+
+from core.sonification.sonify_csv import sonify_from_folder
+from core.sonification.play_audio import play_wav
 
 import numpy as np
 import os
@@ -52,7 +55,7 @@ class ColorPlotPage(QWizardPage):
         apply_custom_styles(self.btn_eval)
         self.btn_eval.clicked.connect(self.run_processing)
 
-        self.cbo_rep = QComboBox(); 
+        self.cbo_rep = QComboBox();
         #apply_custom_styles(self.cbo_rep)
         self.cbo_rep.currentIndexChanged.connect(self.on_replicate_changed)
         
@@ -80,6 +83,7 @@ class ColorPlotPage(QWizardPage):
 
         self.btn_filter = QPushButton("Filter Options"); 
         apply_custom_styles(self.btn_filter)
+
         #btn_apply = QPushButton("Apply Filtering")
         self.btn_filter.clicked.connect(self.show_processing_options)
         self.btn_save = QPushButton("Save Current Plots"); 
@@ -88,6 +92,12 @@ class ColorPlotPage(QWizardPage):
         self.btn_export = QPushButton("Export Current IT")
         apply_custom_styles(self.btn_export)
         self.btn_export.clicked.connect(self.save_processed_data_IT)
+        self.btn_char_extract = QPushButton("Characteristic Extraction")
+        apply_custom_styles(self.btn_char_extract)
+        self.btn_char_extract.clicked.connect(self.export_peak_characteristics)
+        self.sonify_button = QPushButton("Sonify")
+        apply_custom_styles(self.sonify_button)
+        self.sonify_button.clicked.connect(self.on_sonify_clicked)
         self.btn_export_all = QPushButton("Export All ITs")
         apply_custom_styles(self.btn_export_all)
         self.btn_export_all.clicked.connect(self.save_all_ITs)
@@ -124,6 +134,8 @@ class ColorPlotPage(QWizardPage):
         #left.addWidget(btn_apply)
         left.addWidget(self.btn_save)
         left.addWidget(self.btn_export)
+        left.addWidget(self.btn_char_extract)
+        left.addWidget(self.sonify_button)
         left.addWidget(self.btn_export_all)
         peak_label = QLabel("Peak Adjustment")
         peak_label.setStyleSheet("font-size: 10pt; font-weight: bold;")
@@ -521,31 +533,36 @@ class ColorPlotPage(QWizardPage):
     def _missing_peaks(self):
         """Return a list of (rep_index, file_index) that do not have peak metadata."""
         missing = []
+        settings = QSettings("HashemiLab", "NeuroStemVolt")
+        ft = (settings.value("file_type", "None", type=str) or "").strip().lower()
+        is_spontaneous = (ft == "spontaneous")
         group_analysis = self.wizard().group_analysis
+
         for r_idx, exp in enumerate(group_analysis.get_experiments()):
-            file_count = exp.get_file_count()
-            for f_idx in range(file_count):
+            for f_idx in range(exp.get_file_count()):
                 sf = exp.get_spheroid_file(f_idx)
                 md = sf.get_metadata() or {}
-                pos = md.get("peak_amplitude_positions")
 
-                # Missing if None
+                if is_spontaneous:
+                    # zero peaks is valid; missing only if not processed yet
+                    if md.get("spontaneous_peaks", None) is None:
+                        missing.append((r_idx, f_idx))
+                    continue
+
+                pos = md.get("peak_amplitude_positions")
                 if pos is None:
                     missing.append((r_idx, f_idx))
                     continue
-
-                # Missing if empty list
                 if isinstance(pos, (list, tuple)) and len(pos) == 0:
                     missing.append((r_idx, f_idx))
                     continue
-
-                # Missing if NaN scalar
                 try:
                     import math
                     if isinstance(pos, float) and math.isnan(pos):
                         missing.append((r_idx, f_idx))
                 except Exception:
                     pass
+
         return missing
 
     def isComplete(self):
@@ -612,6 +629,45 @@ class ColorPlotPage(QWizardPage):
         sph_file.visualize_color_plot_data(title_suffix = "", save_path=output_folder_path)
         sph_file.visualize_IT_profile(QSettings("HashemiLab", "NeuroStemVolt").value("output_folder"))
 
+    def export_peak_characteristics(self):
+        """Export per-peak characteristics (amplitude + AUC) for all *_COLOR.txt files.
+
+        Writes a *single* CSV into the configured output folder.
+        """
+        settings = QSettings("HashemiLab", "NeuroStemVolt")
+        file_type = settings.value("file_type", "None", type=str)
+        if (file_type or "").strip().lower() != "spontaneous":
+            QMessageBox.information(
+                self,
+                "Not Available",
+                "Characteristic Extraction is currently available for 'Spontaneous' file type only."
+            )
+            return
+
+        ga = self.wizard().group_analysis
+        output_folder = settings.value("output_folder", "", type=str)
+        if not output_folder:
+            output_folder = os.path.join(os.path.expanduser("~"), "Downloads")
+
+        os.makedirs(output_folder, exist_ok=True)
+        out_path = os.path.join(output_folder, "peak_characteristics.csv")
+
+        try:
+            OutputManager.save_spontaneous_peak_characteristics_csv(
+                ga,
+                out_path,
+                file_suffix_filter="_color.txt",
+            )
+        except Exception as e:
+            QMessageBox.critical(self, "Export Failed", f"Could not export peak characteristics:\n{e}")
+            return
+
+        QMessageBox.information(
+            self,
+            "Export Complete",
+            f"Peak characteristics saved to:\n{out_path}"
+        )
+
     def save_processed_data_IT(self):
         """
         Saves the processed I-T data array (not a figure) for the current file.
@@ -630,3 +686,37 @@ class ColorPlotPage(QWizardPage):
         if not enabled:
             # also clear any temporary selection so nothing is drawn
             self.temp_peak = None
+            
+    def on_sonify_clicked(self):
+        try:
+            # Default to your configured output folder
+            settings = QSettings("HashemiLab", "NeuroStemVolt")
+            default_folder = settings.value("output_folder", "", type=str)
+    
+            # Let the user choose the folder containing the CSV
+            folder = QFileDialog.getExistingDirectory(
+                self,
+                "Select the folder containing peak_characteristics.csv",
+                default_folder or os.path.expanduser("~")
+            )
+            if not folder:
+                return
+    
+            # Use whatever replicate/file you are currently viewing
+            replicate = self.cbo_rep.currentText()
+            file_name = self.cbo_file.currentText()
+    
+            wav_path = sonify_from_folder(folder, replicate=replicate, file_name=file_name)
+
+            # PLAY THE AUDIO
+            play_wav(wav_path)
+            
+            QMessageBox.information(
+    self,
+    "Sonify",
+    f"Playing audio.\nSaved WAV:\n{wav_path}"
+)
+
+    
+        except Exception as e:
+            QMessageBox.critical(self, "Sonify failed", str(e))

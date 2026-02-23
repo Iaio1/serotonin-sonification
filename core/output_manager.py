@@ -319,7 +319,97 @@ class OutputManager:
                 df_timepoints.to_csv(os.path.join(spont_folder, output_timepoints), index=False)
 
         return spont_folder
+
     @staticmethod
+    def save_spontaneous_peak_characteristics_csv(
+            group_experiments: GroupAnalysis,
+            output_csv_path: str,
+            file_suffix_filter: str = "_color.txt",
+    ):
+        """Export per-peak characteristics (amplitude + AUC) for spontaneous files.
+
+        Creates a *single* CSV where each row corresponds to one detected peak.
+        If a file has zero peaks, a single row is written with Peak Number = 0.
+
+        Expected input (produced by FindAmplitudeMultiple):
+          - metadata['spontaneous_peaks'] = list of dicts with keys:
+              'amp', 'auc', 'peak_s', 'start_s', 'end_s'
+        """
+        import os
+        import re
+        import pandas as pd
+
+        if not output_csv_path:
+            raise ValueError("output_csv_path must be a non-empty path")
+
+        rows = []
+        missing = []
+        suffix = (file_suffix_filter or "").lower()
+
+        for exp_idx, experiment in enumerate(group_experiments.get_experiments()):
+            rep = f"Rep{exp_idx + 1}"
+            for spheroid_file in experiment.files:
+                file_name = os.path.basename(spheroid_file.get_filepath())
+                if suffix and not file_name.lower().endswith(suffix):
+                    continue
+
+                meta = spheroid_file.get_metadata() or {}
+                peaks = meta.get("spontaneous_peaks", None)
+                if peaks is None:
+                    missing.append(file_name)
+                    continue
+
+                m = re.match(r"^(\d+)", file_name.strip())
+                file_number = int(m.group(1)) if m else None
+
+                # No peaks: still write a row for traceability
+                if isinstance(peaks, (list, tuple)) and len(peaks) == 0:
+                    rows.append({
+                        "Replicate": rep,
+                        "File": file_name,
+                        "File Number": file_number,
+                        "Peak Number": 0,
+                        "Amplitude": None,
+                        "AUC": None,
+                        "Peak Time (s)": None,
+                        "Start (s)": None,
+                        "End (s)": None,
+                    })
+                    continue
+
+                # Peaks present
+                for k, p in enumerate(peaks, start=1):
+                    rows.append({
+                        "Replicate": rep,
+                        "File": file_name,
+                        "File Number": file_number,
+                        "Peak Number": k,
+                        "Amplitude": p.get("amp", None),
+                        "AUC": p.get("auc", None),
+                        "Peak Time (s)": p.get("peak_s", None),
+                        "Start (s)": p.get("start_s", None),
+                        "End (s)": p.get("end_s", None),
+                    })
+
+        if missing:
+            raise ValueError(
+                "Missing spontaneous peak metadata for some files. "
+                "Please press 'Evaluate' to detect peaks first. "
+                f"First missing: {missing[0]}"
+            )
+
+        os.makedirs(os.path.dirname(output_csv_path) or ".", exist_ok=True)
+        df = pd.DataFrame(rows)
+
+        df = df.sort_values(
+            by=["File Number", "Peak Number"],
+            ascending=[True, True],
+            na_position="last",
+        )
+
+        df.to_csv(output_csv_path, index=False)
+        return output_csv_path
+
     def save_all_peak_amplitudes(group_experiments : GroupAnalysis, output_folder_path):
         """
         Save all peak amplitude values and their positions (in seconds) for each replicate.
