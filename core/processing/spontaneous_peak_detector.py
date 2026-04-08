@@ -234,6 +234,55 @@ class FindAmplitudeMultiple(Processor):
         except:
             return False
 
+    def _estimate_baseline(self, fx, freq, baseline_sec):
+        """
+        Estimate the slow drift baseline for spontaneous FSCV traces.
+        Prefer ALS so linear downward drift is modeled as baseline, while
+        retaining the previous rolling-median approach as a fallback.
+        """
+        try:
+            from scipy import sparse
+            from scipy.sparse.linalg import spsolve
+
+            lam = 1e6
+            p = 0.01
+            niter = 10
+            n = len(fx)
+
+            D = sparse.diags([1, -2, 1], [0, 1, 2], shape=(n - 2, n), format="csc")
+            DTD = lam * D.T.dot(D)
+            w = np.ones(n)
+            baseline = fx.copy()
+
+            for _ in range(niter):
+                W = sparse.diags(w, format="csc")
+                baseline = spsolve(W + DTD, w * fx)
+                w = p * (fx > baseline).astype(float) + (1.0 - p) * (fx <= baseline).astype(float)
+
+            return baseline, "als"
+        except Exception:
+            try:
+                import pandas as pd
+
+                bw = max(5, int(round(baseline_sec * freq)))
+                if bw % 2 == 0:
+                    bw += 1
+                baseline = (
+                    pd.Series(fx)
+                    .rolling(window=bw, center=True, min_periods=1)
+                    .median()
+                    .to_numpy()
+                )
+            except Exception:
+                from scipy.signal import medfilt
+
+                bw = max(5, int(round(baseline_sec * freq)))
+                if bw % 2 == 0:
+                    bw += 1
+                baseline = medfilt(fx, kernel_size=bw)
+
+            return baseline, "rolling_median_fallback"
+
     def process(self, data, context=None):
             """
             Robust multi-peak detection on the I–T profile using:
@@ -270,24 +319,7 @@ class FindAmplitudeMultiple(Processor):
             fx_s = fx               
 
             # 3) Remove drift baseline (rolling median; robust to steps)
-            try:
-                import pandas as pd
-                bw = max(5, int(round(baseline_sec * freq)))
-                if bw % 2 == 0:
-                    bw += 1
-                baseline = (
-                    pd.Series(fx_s)
-                    .rolling(window=bw, center=True, min_periods=1)
-                    .median()
-                    .to_numpy()
-                )
-            except Exception:
-                # Fallback: median filter
-                from scipy.signal import medfilt
-                bw = max(5, int(round(baseline_sec * freq)))
-                if bw % 2 == 0:
-                    bw += 1
-                baseline = medfilt(fx_s, kernel_size=bw)
+            baseline, baseline_method = self._estimate_baseline(fx_s, freq, baseline_sec)
 
             resid = fx_s - baseline
 
@@ -399,6 +431,7 @@ class FindAmplitudeMultiple(Processor):
                     "freq_hz": freq,
                     "smooth_sec": smooth_sec,
                     "baseline_sec": baseline_sec,
+                    "baseline_method": baseline_method,
                     "k_enter": k_enter,
                     "k_exit": k_exit,
                     "min_width_sec": min_width_sec,
