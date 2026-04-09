@@ -14,6 +14,8 @@ import numpy as np
 PITCH_BINS_MIDI = [60, 62, 64, 67, 71]
 DURATION_BINS_BEATS = [0.5, 1.0, 2.0, 4.0]
 TEMPO_BPM = 120
+BETWEEN_FILE_GAP_S = 0.5
+INTERPEAK_TIME_SCALE = 0.125
 
 def _latest_csv_in_folder(folder: str) -> str:
     patterns = [
@@ -117,11 +119,48 @@ def _rows_to_note_events(rows, amp_col, auc_col, time_col, file_number_col, file
     auc_lo, auc_hi = float(np.min(aucs)), float(np.max(aucs))
     seconds_per_beat = 60.0 / float(TEMPO_BPM)
 
+    for row in parsed_rows:
+        file_number = _to_float(row["file_number"])
+        peak_number = _to_float(row["peak_number"])
+        row["_file_number_sort"] = int(file_number) if file_number is not None else None
+        row["_peak_number_sort"] = int(peak_number) if peak_number is not None else None
+        row["_peak_time_sort"] = (
+            float(row["source_peak_time_s"])
+            if row["source_peak_time_s"] is not None else float("inf")
+        )
+
+    parsed_rows.sort(
+        key=lambda row: (
+            row["_file_number_sort"] if row["_file_number_sort"] is not None else float("inf"),
+            row["file_name"] or "",
+            row["_peak_time_sort"],
+            row["_peak_number_sort"] if row["_peak_number_sort"] is not None else float("inf"),
+        )
+    )
+
     note_events = []
+    running_onset_s = 0.0
+    prev_file_key = None
+    prev_peak_time_s = None
+
     for idx, row in enumerate(parsed_rows):
-        onset_s = row["source_peak_time_s"]
-        if onset_s is None:
-            onset_s = idx * 0.2
+        file_key = (row["_file_number_sort"], row["file_name"])
+        peak_time_s = row["source_peak_time_s"]
+
+        if idx == 0:
+            onset_s = 0.0
+        elif file_key == prev_file_key:
+            if peak_time_s is not None and prev_peak_time_s is not None:
+                running_onset_s += (
+                    max(0.0, float(peak_time_s) - float(prev_peak_time_s))
+                    * INTERPEAK_TIME_SCALE
+                )
+            else:
+                running_onset_s += 0.2
+            onset_s = running_onset_s
+        else:
+            running_onset_s += BETWEEN_FILE_GAP_S
+            onset_s = running_onset_s
 
         pitch_norm = _normalize_value(row["source_amplitude"], amp_lo, amp_hi)
         dur_norm = _normalize_value(row["source_auc"], auc_lo, auc_hi)
@@ -143,10 +182,15 @@ def _rows_to_note_events(rows, amp_col, auc_col, time_col, file_number_col, file
             "duration_s": duration_s,
             "source_amplitude": float(row["source_amplitude"]),
             "source_auc": float(row["source_auc"]),
-            "source_peak_time_s": float(onset_s),
+            "source_peak_time_s": (
+                float(row["source_peak_time_s"])
+                if row["source_peak_time_s"] is not None else None
+            ),
         })
 
-    note_events.sort(key=lambda ev: ev["onset_s"])
+        prev_file_key = file_key
+        prev_peak_time_s = peak_time_s
+
     return note_events
 
 def _sine(freq_hz, dur_s, sr):
