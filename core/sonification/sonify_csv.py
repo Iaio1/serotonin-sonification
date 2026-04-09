@@ -11,7 +11,7 @@ import csv
 import wave
 import numpy as np
 
-PITCH_BINS_MIDI = [60, 62, 64, 67, 71]
+PITCH_BINS_MIDI = [48, 52, 55, 59, 60, 62, 64, 67, 71, 74]
 DURATION_BINS_BEATS = [0.5, 1.0, 2.0, 4.0]
 TEMPO_BPM = 120
 BETWEEN_FILE_GAP_S = 0.5
