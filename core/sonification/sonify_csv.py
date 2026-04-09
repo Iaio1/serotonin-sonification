@@ -11,6 +11,10 @@ import csv
 import wave
 import numpy as np
 
+PITCH_BINS_MIDI = [60, 62, 64, 67, 71]
+DURATION_BINS_BEATS = [0.5, 1.0, 2.0, 4.0]
+TEMPO_BPM = 120
+
 def _latest_csv_in_folder(folder: str) -> str:
     patterns = [
         os.path.join(folder, "peak_characteristics*.csv"),
@@ -64,6 +68,87 @@ def _lin_map(x, lo, hi, out_lo, out_hi):
     t = max(0.0, min(1.0, t))
     return out_lo + t * (out_hi - out_lo)
 
+def _midi_to_hz(midi_note):
+    return 440.0 * (2.0 ** ((float(midi_note) - 69.0) / 12.0))
+
+def _normalize_value(x, lo, hi):
+    if hi <= lo:
+        return 0.5
+    t = (float(x) - float(lo)) / (float(hi) - float(lo))
+    return max(0.0, min(1.0, t))
+
+def _snap_normalized_to_bins(norm_value, bins):
+    if not bins:
+        raise ValueError("bins must be a non-empty sequence")
+    if len(bins) == 1:
+        return bins[0]
+
+    positions = np.linspace(0.0, 1.0, len(bins))
+    idx = int(np.argmin(np.abs(positions - norm_value)))
+    return bins[idx]
+
+def _rows_to_note_events(rows, amp_col, auc_col, time_col, file_number_col, file_name_col, peak_number_col):
+    amps = []
+    aucs = []
+    parsed_rows = []
+
+    for r in rows:
+        amp = _to_float(r.get(amp_col))
+        auc = _to_float(r.get(auc_col))
+        onset_s = _to_float(r.get(time_col)) if time_col else None
+        if amp is None or auc is None:
+            continue
+
+        parsed_rows.append({
+            "file_number": r.get(file_number_col) if file_number_col else None,
+            "file_name": r.get(file_name_col) if file_name_col else None,
+            "peak_number": r.get(peak_number_col) if peak_number_col else None,
+            "source_amplitude": abs(amp),
+            "source_auc": abs(auc),
+            "source_peak_time_s": onset_s,
+        })
+        amps.append(abs(amp))
+        aucs.append(abs(auc))
+
+    if not parsed_rows:
+        raise ValueError("No usable peak rows (amp/auc could not be parsed).")
+
+    amp_lo, amp_hi = float(np.min(amps)), float(np.max(amps))
+    auc_lo, auc_hi = float(np.min(aucs)), float(np.max(aucs))
+    seconds_per_beat = 60.0 / float(TEMPO_BPM)
+
+    note_events = []
+    for idx, row in enumerate(parsed_rows):
+        onset_s = row["source_peak_time_s"]
+        if onset_s is None:
+            onset_s = idx * 0.2
+
+        pitch_norm = _normalize_value(row["source_amplitude"], amp_lo, amp_hi)
+        dur_norm = _normalize_value(row["source_auc"], auc_lo, auc_hi)
+
+        pitch_midi = int(_snap_normalized_to_bins(pitch_norm, PITCH_BINS_MIDI))
+        duration_beats = float(_snap_normalized_to_bins(dur_norm, DURATION_BINS_BEATS))
+        duration_s = duration_beats * seconds_per_beat
+
+        file_number = _to_float(row["file_number"])
+        peak_number = _to_float(row["peak_number"])
+
+        note_events.append({
+            "file_number": int(file_number) if file_number is not None else None,
+            "file_name": row["file_name"],
+            "peak_number": int(peak_number) if peak_number is not None else None,
+            "onset_s": float(onset_s),
+            "pitch_midi": pitch_midi,
+            "duration_beats": duration_beats,
+            "duration_s": duration_s,
+            "source_amplitude": float(row["source_amplitude"]),
+            "source_auc": float(row["source_auc"]),
+            "source_peak_time_s": float(onset_s),
+        })
+
+    note_events.sort(key=lambda ev: ev["onset_s"])
+    return note_events
+
 def _sine(freq_hz, dur_s, sr):
     n = max(1, int(round(dur_s * sr)))
     t = np.arange(n, dtype=np.float32) / sr
@@ -112,6 +197,8 @@ def sonify_from_csv(csv_path: str, replicate: str = None, file_name: str = None)
         amp_col = _find_col(reader.fieldnames, ["Amplitude", "Amp", "amp"])
         auc_col = _find_col(reader.fieldnames, ["AUC", "auc", "Area"])
         time_col = _find_col(reader.fieldnames, ["Peak Time (s)", "Peak Time", "peak_s", "peak time"])
+        peak_number_col = _find_col(reader.fieldnames, ["Peak Number", "peak_number"])
+        file_number_col = _find_col(reader.fieldnames, ["File Number", "file_number"])
         rep_col  = _find_col(reader.fieldnames, ["Replicate", "replicate"])
         file_col = _find_col(reader.fieldnames, ["File Name", "File", "Filename", "file"])
 
@@ -155,49 +242,24 @@ def sonify_from_csv(csv_path: str, replicate: str = None, file_name: str = None)
     if not rows:
         rows = rows_all
 
+    note_events = _rows_to_note_events(
+        rows,
+        amp_col=amp_col,
+        auc_col=auc_col,
+        time_col=time_col,
+        file_number_col=file_number_col,
+        file_name_col=file_col,
+        peak_number_col=peak_number_col,
+    )
 
-    amps = []
-    aucs = []
-    times = []
-
-    for r in rows:
-        a = _to_float(r.get(amp_col))
-        u = _to_float(r.get(auc_col))
-        t = _to_float(r.get(time_col)) if time_col else None
-        if a is None or u is None:
-            continue
-        amps.append(abs(a))
-        aucs.append(abs(u))
-        times.append(t if t is not None else len(times) * 0.2)  # fallback spacing
-
-    if len(amps) == 0:
-        raise ValueError("No usable peak rows (amp/auc could not be parsed).")
-
-    amps = np.array(amps, dtype=float)
-    aucs = np.array(aucs, dtype=float)
-    times = np.array(times, dtype=float)
-
-    order = np.argsort(times)
-    amps, aucs, times = amps[order], aucs[order], times[order]
-
-    # Auto-scale to ANY CSV (no fixed dataset values)
-    a_lo, a_hi = float(np.min(amps)), float(np.max(amps))
-    u_lo, u_hi = float(np.min(aucs)), float(np.max(aucs))
-
-    # Mapping ranges (tweak later if you want)
-    FMIN, FMAX = 220.0, 880.0     # pitch range
-    DMIN, DMAX = 0.08, 0.60       # duration range
     SR = 44100
-
-    freqs = np.array([_exp_map(x, a_lo, a_hi, FMIN, FMAX) for x in amps], dtype=float)
-    durs  = np.array([_lin_map(x, u_lo, u_hi, DMIN, DMAX) for x in aucs], dtype=float)
-
-    total_len = float(np.max(times + durs) + 0.25)
+    total_len = float(max(ev["onset_s"] + ev["duration_s"] for ev in note_events) + 0.25)
     audio = np.zeros(int(total_len * SR), dtype=np.float32)
 
-    for f, d, t0 in zip(freqs, durs, times):
-        note = _sine(f, d, SR) * 0.5
-        i0 = int(round(t0 * SR))
+    for event in note_events:
+        freq_hz = _midi_to_hz(event["pitch_midi"])
+        note = _sine(freq_hz, event["duration_s"], SR) * 0.5
+        i0 = int(round(event["onset_s"] * SR))
         i1 = min(audio.size, i0 + note.size)
         if i0 < audio.size:
             audio[i0:i1] += note[: (i1 - i0)]
