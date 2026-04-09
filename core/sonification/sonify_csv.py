@@ -17,9 +17,13 @@ DURATION_BINS_BEATS = [0.5, 1.0, 2.0, 4.0]
 TEMPO_BPM = 120
 BETWEEN_FILE_GAP_S = 0.5
 INTERPEAK_TIME_SCALE = 0.125
-AMPLITUDE_PITCH_LOWER_PERCENTILE = 5
-AMPLITUDE_PITCH_UPPER_PERCENTILE = 95
-AMPLITUDE_PITCH_GAMMA = 0.6
+AMPLITUDE_PITCH_LOW_PCT = 10
+AMPLITUDE_PITCH_HIGH_PCT = 95
+AMPLITUDE_PITCH_GAMMA = 1.4
+AUC_DURATION_LOW_PCT = 5
+AUC_DURATION_HIGH_PCT = 95
+AUC_DURATION_GAMMA = 0.6
+NOTE_DURATION_SCALE = 1.75
 MIDI_TICKS_PER_BEAT = 480
 MIDI_PROGRAM = 0
 MIDI_VELOCITY = 90
@@ -147,11 +151,16 @@ def _rows_to_note_events(rows, amp_col, auc_col, time_col, file_number_col, file
 
     amp_lo, amp_hi = np.percentile(
         np.asarray(amps, dtype=float),
-        [AMPLITUDE_PITCH_LOWER_PERCENTILE, AMPLITUDE_PITCH_UPPER_PERCENTILE],
+        [AMPLITUDE_PITCH_LOW_PCT, AMPLITUDE_PITCH_HIGH_PCT],
     )
     amp_lo = float(amp_lo)
     amp_hi = float(amp_hi)
-    auc_lo, auc_hi = float(np.min(aucs)), float(np.max(aucs))
+    auc_lo, auc_hi = np.percentile(
+        np.asarray(aucs, dtype=float),
+        [AUC_DURATION_LOW_PCT, AUC_DURATION_HIGH_PCT],
+    )
+    auc_lo = float(auc_lo)
+    auc_hi = float(auc_hi)
     seconds_per_beat = 60.0 / float(TEMPO_BPM)
 
     for row in parsed_rows:
@@ -198,13 +207,17 @@ def _rows_to_note_events(rows, amp_col, auc_col, time_col, file_number_col, file
             onset_s = running_onset_s
 
         clipped_amplitude = min(max(row["source_amplitude"], amp_lo), amp_hi)
-        pitch_norm = _normalize_value(clipped_amplitude, amp_lo, amp_hi)
-        pitch_norm = pitch_norm ** AMPLITUDE_PITCH_GAMMA
-        dur_norm = _normalize_value(row["source_auc"], auc_lo, auc_hi)
+        normalized_amplitude = _normalize_value(clipped_amplitude, amp_lo, amp_hi)
+        curved_pitch_value = normalized_amplitude ** AMPLITUDE_PITCH_GAMMA
 
-        pitch_midi = int(_snap_normalized_to_bins(pitch_norm, PITCH_BINS_MIDI))
-        duration_beats = float(_snap_normalized_to_bins(dur_norm, DURATION_BINS_BEATS))
+        clipped_auc = min(max(row["source_auc"], auc_lo), auc_hi)
+        normalized_auc = _normalize_value(clipped_auc, auc_lo, auc_hi)
+        curved_duration_value = normalized_auc ** AUC_DURATION_GAMMA
+
+        pitch_midi = int(_snap_normalized_to_bins(curved_pitch_value, PITCH_BINS_MIDI))
+        duration_beats = float(_snap_normalized_to_bins(curved_duration_value, DURATION_BINS_BEATS))
         duration_s = duration_beats * seconds_per_beat
+        rendered_duration_s = duration_s * NOTE_DURATION_SCALE
 
         file_number = _to_float(row["file_number"])
         peak_number = _to_float(row["peak_number"])
@@ -216,7 +229,7 @@ def _rows_to_note_events(rows, amp_col, auc_col, time_col, file_number_col, file
             "onset_s": float(onset_s),
             "pitch_midi": pitch_midi,
             "duration_beats": duration_beats,
-            "duration_s": duration_s,
+            "duration_s": rendered_duration_s,
             "source_amplitude": float(row["source_amplitude"]),
             "source_auc": float(row["source_auc"]),
             "source_peak_time_s": (
