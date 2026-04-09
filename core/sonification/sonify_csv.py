@@ -93,13 +93,16 @@ def _write_wav(path, audio, sr):
         wf.setframerate(sr)
         wf.writeframes(pcm.tobytes())
 
-def sonify_from_folder(folder: str, replicate: str = None, file_name: str = None) -> str:
+def sonify_from_csv(csv_path: str, replicate: str = None, file_name: str = None) -> str:
     """
-    Finds latest peak_characteristics*.csv in folder, converts peaks to sound:
+    Convert an exported spontaneous peak-characteristics CSV to sound:
       amplitude -> pitch, auc -> duration
-    Plays the WAV (Windows) and returns the WAV path.
+    and peak time -> note onset. Returns the generated WAV path.
     """
-    csv_path = _latest_csv_in_folder(folder)
+    if not csv_path:
+        raise ValueError("csv_path must be a non-empty path")
+    if not os.path.isfile(csv_path):
+        raise FileNotFoundError(f"Peak characteristics CSV not found:\n{csv_path}")
 
     with open(csv_path, "r", newline="", encoding="utf-8-sig") as f:
         reader = csv.DictReader(f)
@@ -110,7 +113,7 @@ def sonify_from_folder(folder: str, replicate: str = None, file_name: str = None
         auc_col = _find_col(reader.fieldnames, ["AUC", "auc", "Area"])
         time_col = _find_col(reader.fieldnames, ["Peak Time (s)", "Peak Time", "peak_s", "peak time"])
         rep_col  = _find_col(reader.fieldnames, ["Replicate", "replicate"])
-        file_col = _find_col(reader.fieldnames, ["File", "Filename", "file"])
+        file_col = _find_col(reader.fieldnames, ["File Name", "File", "Filename", "file"])
 
         if amp_col is None or auc_col is None:
             raise ValueError(f"CSV missing required columns. Found: {reader.fieldnames}")
@@ -199,21 +202,11 @@ def sonify_from_folder(folder: str, replicate: str = None, file_name: str = None
         if i0 < audio.size:
             audio[i0:i1] += note[: (i1 - i0)]
 
-    out_wav = os.path.join(folder, "sonification.wav")
+    out_wav = os.path.join(os.path.dirname(csv_path) or ".", "sonification.wav")
     _write_wav(out_wav, audio, SR)
-
-    # Play immediately on Windows (no extra packages)
-    # Play using sounddevice (cross-platform, reliable)
-    try:
-        import sounddevice as sd
-        import soundfile as sf
-    
-        data, sr = sf.read(out_wav, dtype='float32')
-        sd.play(data, sr)
-        sd.wait()
-    
-    except Exception as e:
-        print("Audio playback failed:", e)
-    
-
     return out_wav
+
+def sonify_from_folder(folder: str, replicate: str = None, file_name: str = None) -> str:
+    """Backward-compatible wrapper that resolves the latest CSV within a folder."""
+    csv_path = _latest_csv_in_folder(folder)
+    return sonify_from_csv(csv_path, replicate=replicate, file_name=file_name)

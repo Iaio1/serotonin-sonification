@@ -15,7 +15,7 @@ from core.processing import *
 from core.processing.find_amplitude import FindAmplitude
 from core.processing.spontaneous_peak_detector import FindAmplitudeMultiple
 
-from core.sonification.sonify_csv import sonify_from_folder
+from core.sonification.sonify_csv import sonify_from_csv
 from core.sonification.play_audio import play_wav
 
 import numpy as np
@@ -46,6 +46,7 @@ class ColorPlotPage(QWizardPage):
         self.selected_processors = []
         self.file_index_mapping = []  # Add this to track sorted file indices
         self.temp_peak = None
+        self.last_peak_characteristics_csv = None
 
         # Left controls
         self.btn_revert = QPushButton("Reverse Changes")
@@ -656,8 +657,8 @@ class ColorPlotPage(QWizardPage):
             OutputManager.save_spontaneous_peak_characteristics_csv(
                 ga,
                 out_path,
-                file_suffix_filter="_color.txt",
             )
+            self.last_peak_characteristics_csv = out_path
         except Exception as e:
             QMessageBox.critical(self, "Export Failed", f"Could not export peak characteristics:\n{e}")
             return
@@ -689,33 +690,36 @@ class ColorPlotPage(QWizardPage):
             
     def on_sonify_clicked(self):
         try:
-            # Default to your configured output folder
             settings = QSettings("HashemiLab", "NeuroStemVolt")
             default_folder = settings.value("output_folder", "", type=str)
-    
-            # Let the user choose the folder containing the CSV
-            folder = QFileDialog.getExistingDirectory(
-                self,
-                "Select the folder containing peak_characteristics.csv",
-                default_folder or os.path.expanduser("~")
-            )
-            if not folder:
-                return
-    
-            # Use whatever replicate/file you are currently viewing
+            csv_path = self.last_peak_characteristics_csv
+
+            if not csv_path or not os.path.isfile(csv_path):
+                suggested_path = os.path.join(
+                    default_folder or os.path.expanduser("~"),
+                    "peak_characteristics.csv",
+                )
+                csv_path, _ = QFileDialog.getOpenFileName(
+                    self,
+                    "Select peak_characteristics CSV",
+                    suggested_path,
+                    "CSV Files (*.csv)",
+                )
+                if not csv_path:
+                    return
+
             replicate = self.cbo_rep.currentText()
             file_name = self.cbo_file.currentText()
-    
-            wav_path = sonify_from_folder(folder, replicate=replicate, file_name=file_name)
 
-            # PLAY THE AUDIO
+            wav_path = sonify_from_csv(csv_path, replicate=replicate, file_name=file_name)
+
             play_wav(wav_path)
             
             QMessageBox.information(
-    self,
-    "Sonify",
-    f"Playing audio.\nSaved WAV:\n{wav_path}"
-)
+                self,
+                "Sonify",
+                f"Playing audio.\nSource CSV:\n{csv_path}\n\nSaved WAV:\n{wav_path}"
+            )
 
     
         except Exception as e:

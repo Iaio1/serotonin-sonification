@@ -7,6 +7,44 @@ from scipy.stats import sem
 
 class OutputManager:
     @staticmethod
+    def _coerce_optional_int(value):
+        """Convert a metadata value to int when possible, otherwise return None."""
+        if value is None:
+            return None
+        try:
+            if isinstance(value, str) and value.strip() == "":
+                return None
+            return int(value)
+        except Exception:
+            return None
+
+    @staticmethod
+    def _resolve_spontaneous_file_number(meta, file_name, fallback_index):
+        """
+        Resolve a stable file identifier for spontaneous exports.
+        Prefer metadata when available, then a numeric filename prefix, and
+        finally fall back to the deterministic load order within the replicate.
+        """
+        import re
+
+        candidate_keys = [
+            "file_number",
+            "file_index",
+            "timepoint",
+            "file_timepoint",
+        ]
+        for key in candidate_keys:
+            file_number = OutputManager._coerce_optional_int((meta or {}).get(key))
+            if file_number is not None:
+                return file_number
+
+        match = re.match(r"^(\d+)", (file_name or "").strip())
+        if match:
+            return int(match.group(1))
+
+        return int(fallback_index)
+
+    @staticmethod
     def save_ITs(group_experiments : GroupAnalysis, output_folder_path):
         """
         Save processed IT data for each experiment into individual CSV files.
@@ -324,7 +362,7 @@ class OutputManager:
     def save_spontaneous_peak_characteristics_csv(
             group_experiments: GroupAnalysis,
             output_csv_path: str,
-            file_suffix_filter: str = "_color.txt",
+            file_suffix_filter: str = None,
     ):
         """Export per-peak characteristics (amplitude + AUC) for spontaneous files.
 
@@ -342,16 +380,33 @@ class OutputManager:
         if not output_csv_path:
             raise ValueError("output_csv_path must be a non-empty path")
 
+        columns = [
+            "Replicate",
+            "File Number",
+            "File Name",
+            "Peak Number",
+            "Peak Time (s)",
+            "Amplitude",
+            "AUC",
+            "FWHM (s)",
+            "Rise (s)",
+            "Decay (s)",
+            "SNR",
+            "Start Time (s)",
+            "End Time (s)",
+        ]
         rows = []
         missing = []
         suffix = (file_suffix_filter or "").lower()
+        eligible_files = 0
 
         for exp_idx, experiment in enumerate(group_experiments.get_experiments()):
             rep = f"Rep{exp_idx + 1}"
-            for spheroid_file in experiment.files:
+            for file_idx, spheroid_file in enumerate(experiment.files, start=1):
                 file_name = os.path.basename(spheroid_file.get_filepath())
                 if suffix and not file_name.lower().endswith(suffix):
                     continue
+                eligible_files += 1
 
                 meta = spheroid_file.get_metadata() or {}
                 peaks = meta.get("spontaneous_peaks", None)
@@ -359,21 +414,28 @@ class OutputManager:
                     missing.append(file_name)
                     continue
 
-                m = re.match(r"^(\d+)", file_name.strip())
-                file_number = int(m.group(1)) if m else None
+                file_number = OutputManager._resolve_spontaneous_file_number(
+                    meta,
+                    file_name,
+                    fallback_index=file_idx,
+                )
 
                 # No peaks: still write a row for traceability
                 if isinstance(peaks, (list, tuple)) and len(peaks) == 0:
                     rows.append({
                         "Replicate": rep,
-                        "File": file_name,
                         "File Number": file_number,
+                        "File Name": file_name,
                         "Peak Number": 0,
+                        "Peak Time (s)": None,
                         "Amplitude": None,
                         "AUC": None,
-                        "Peak Time (s)": None,
-                        "Start (s)": None,
-                        "End (s)": None,
+                        "FWHM (s)": None,
+                        "Rise (s)": None,
+                        "Decay (s)": None,
+                        "SNR": None,
+                        "Start Time (s)": None,
+                        "End Time (s)": None,
                     })
                     continue
 
@@ -381,14 +443,18 @@ class OutputManager:
                 for k, p in enumerate(peaks, start=1):
                     rows.append({
                         "Replicate": rep,
-                        "File": file_name,
                         "File Number": file_number,
+                        "File Name": file_name,
                         "Peak Number": k,
+                        "Peak Time (s)": p.get("peak_s", None),
                         "Amplitude": p.get("amp", None),
                         "AUC": p.get("auc", None),
-                        "Peak Time (s)": p.get("peak_s", None),
-                        "Start (s)": p.get("start_s", None),
-                        "End (s)": p.get("end_s", None),
+                        "FWHM (s)": p.get("fwhm_s", None),
+                        "Rise (s)": p.get("rise_s", None),
+                        "Decay (s)": p.get("decay_s", None),
+                        "SNR": p.get("snr", None),
+                        "Start Time (s)": p.get("start_s", None),
+                        "End Time (s)": p.get("end_s", None),
                     })
 
         if missing:
@@ -398,14 +464,27 @@ class OutputManager:
                 f"First missing: {missing[0]}"
             )
 
-        os.makedirs(os.path.dirname(output_csv_path) or ".", exist_ok=True)
-        df = pd.DataFrame(rows)
+        if eligible_files == 0:
+            raise ValueError(
+                "No spontaneous files were eligible for export. "
+                "This usually means no evaluated files are loaded, or a filename filter excluded them."
+            )
 
-        df = df.sort_values(
-            by=["File Number", "Peak Number"],
-            ascending=[True, True],
-            na_position="last",
-        )
+        if not rows:
+            raise ValueError(
+                "No spontaneous peak rows were generated for export. "
+                "The files were checked, but there were no exportable spontaneous peak records."
+            )
+
+        os.makedirs(os.path.dirname(output_csv_path) or ".", exist_ok=True)
+        df = pd.DataFrame(rows, columns=columns)
+
+        if not df.empty:
+            df = df.sort_values(
+                by=["Replicate", "File Number", "Peak Number"],
+                ascending=[True, True, True],
+                na_position="last",
+            )
 
         df.to_csv(output_csv_path, index=False)
         return output_csv_path
