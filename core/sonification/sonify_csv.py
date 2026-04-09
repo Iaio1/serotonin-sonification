@@ -16,6 +16,9 @@ DURATION_BINS_BEATS = [0.5, 1.0, 2.0, 4.0]
 TEMPO_BPM = 120
 BETWEEN_FILE_GAP_S = 0.5
 INTERPEAK_TIME_SCALE = 0.125
+AMPLITUDE_PITCH_LOWER_PERCENTILE = 5
+AMPLITUDE_PITCH_UPPER_PERCENTILE = 95
+AMPLITUDE_PITCH_GAMMA = 0.6
 
 def _latest_csv_in_folder(folder: str) -> str:
     patterns = [
@@ -115,7 +118,12 @@ def _rows_to_note_events(rows, amp_col, auc_col, time_col, file_number_col, file
     if not parsed_rows:
         raise ValueError("No usable peak rows (amp/auc could not be parsed).")
 
-    amp_lo, amp_hi = float(np.min(amps)), float(np.max(amps))
+    amp_lo, amp_hi = np.percentile(
+        np.asarray(amps, dtype=float),
+        [AMPLITUDE_PITCH_LOWER_PERCENTILE, AMPLITUDE_PITCH_UPPER_PERCENTILE],
+    )
+    amp_lo = float(amp_lo)
+    amp_hi = float(amp_hi)
     auc_lo, auc_hi = float(np.min(aucs)), float(np.max(aucs))
     seconds_per_beat = 60.0 / float(TEMPO_BPM)
 
@@ -162,7 +170,9 @@ def _rows_to_note_events(rows, amp_col, auc_col, time_col, file_number_col, file
             running_onset_s += BETWEEN_FILE_GAP_S
             onset_s = running_onset_s
 
-        pitch_norm = _normalize_value(row["source_amplitude"], amp_lo, amp_hi)
+        clipped_amplitude = min(max(row["source_amplitude"], amp_lo), amp_hi)
+        pitch_norm = _normalize_value(clipped_amplitude, amp_lo, amp_hi)
+        pitch_norm = pitch_norm ** AMPLITUDE_PITCH_GAMMA
         dur_norm = _normalize_value(row["source_auc"], auc_lo, auc_hi)
 
         pitch_midi = int(_snap_normalized_to_bins(pitch_norm, PITCH_BINS_MIDI))
