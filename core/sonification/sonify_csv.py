@@ -8,6 +8,7 @@ Created on Mon Feb 16 14:23:04 2026
 import os
 import glob
 import csv
+import struct
 import wave
 import numpy as np
 
@@ -19,6 +20,9 @@ INTERPEAK_TIME_SCALE = 0.125
 AMPLITUDE_PITCH_LOWER_PERCENTILE = 5
 AMPLITUDE_PITCH_UPPER_PERCENTILE = 95
 AMPLITUDE_PITCH_GAMMA = 0.6
+MIDI_TICKS_PER_BEAT = 480
+MIDI_PROGRAM = 0
+MIDI_VELOCITY = 90
 
 def _latest_csv_in_folder(folder: str) -> str:
     patterns = [
@@ -91,6 +95,29 @@ def _snap_normalized_to_bins(norm_value, bins):
     positions = np.linspace(0.0, 1.0, len(bins))
     idx = int(np.argmin(np.abs(positions - norm_value)))
     return bins[idx]
+
+def _encode_var_len(value):
+    value = int(max(0, value))
+    buffer = value & 0x7F
+    while True:
+        value >>= 7
+        if value == 0:
+            break
+        buffer <<= 8
+        buffer |= ((value & 0x7F) | 0x80)
+
+    out = bytearray()
+    while True:
+        out.append(buffer & 0xFF)
+        if buffer & 0x80:
+            buffer >>= 8
+        else:
+            break
+    return bytes(out)
+
+def _seconds_to_midi_ticks(seconds):
+    ticks_per_second = (float(TEMPO_BPM) / 60.0) * float(MIDI_TICKS_PER_BEAT)
+    return int(round(float(seconds) * ticks_per_second))
 
 def _rows_to_note_events(rows, amp_col, auc_col, time_col, file_number_col, file_name_col, peak_number_col):
     amps = []
@@ -202,6 +229,50 @@ def _rows_to_note_events(rows, amp_col, auc_col, time_col, file_number_col, file
         prev_peak_time_s = peak_time_s
 
     return note_events
+
+def events_to_midi(note_events, midi_path):
+    """Write the current quantized note events to a type-0 MIDI file."""
+    if not midi_path:
+        raise ValueError("midi_path must be a non-empty path")
+
+    os.makedirs(os.path.dirname(midi_path) or ".", exist_ok=True)
+
+    microseconds_per_beat = int(round(60_000_000 / float(TEMPO_BPM)))
+    track_events = [
+        (0, 0, b"\xFF\x51\x03" + microseconds_per_beat.to_bytes(3, "big")),
+        (0, 1, bytes([0xC0, int(MIDI_PROGRAM) & 0x7F])),
+    ]
+
+    for note in note_events:
+        pitch = int(note["pitch_midi"]) & 0x7F
+        start_tick = max(0, _seconds_to_midi_ticks(note["onset_s"]))
+        duration_tick = max(1, _seconds_to_midi_ticks(note["duration_s"]))
+        end_tick = start_tick + duration_tick
+
+        track_events.append((start_tick, 3, bytes([0x90, pitch, int(MIDI_VELOCITY) & 0x7F])))
+        track_events.append((end_tick, 2, bytes([0x80, pitch, 0])))
+
+    track_events.sort(key=lambda item: (item[0], item[1], item[2]))
+
+    track_data = bytearray()
+    last_tick = 0
+    for abs_tick, _, message in track_events:
+        delta = abs_tick - last_tick
+        track_data.extend(_encode_var_len(delta))
+        track_data.extend(message)
+        last_tick = abs_tick
+
+    track_data.extend(_encode_var_len(0))
+    track_data.extend(b"\xFF\x2F\x00")
+
+    header = b"MThd" + struct.pack(">IHHH", 6, 0, 1, int(MIDI_TICKS_PER_BEAT))
+    track = b"MTrk" + struct.pack(">I", len(track_data)) + bytes(track_data)
+
+    with open(midi_path, "wb") as fh:
+        fh.write(header)
+        fh.write(track)
+
+    return midi_path
 
 def _sine(freq_hz, dur_s, sr):
     n = max(1, int(round(dur_s * sr)))
@@ -320,6 +391,8 @@ def sonify_from_csv(csv_path: str, replicate: str = None, file_name: str = None)
 
     out_wav = os.path.join(os.path.dirname(csv_path) or ".", "sonification.wav")
     _write_wav(out_wav, audio, SR)
+    out_midi = os.path.join(os.path.dirname(csv_path) or ".", "sonification.mid")
+    events_to_midi(note_events, out_midi)
     return out_wav
 
 def sonify_from_folder(folder: str, replicate: str = None, file_name: str = None) -> str:
