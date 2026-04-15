@@ -11,3 +11,9 @@ ui/.DS_Store
 build/
 dist/
 main.spec
+test_data/
+debug_output/
+analysis_output/
+.claude/
+.vscode/
+validate_peak_detection.py
