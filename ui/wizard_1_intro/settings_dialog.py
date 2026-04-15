@@ -22,7 +22,7 @@ class ExperimentSettingsDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle("Experiment Settings")
 
-        self.qsettings = QSettings("HashemiLab", "NeuroStemVolt")
+        self.qsettings = QSettings("HashemiLab", "NeuroStemSound")
 
         defaults = {
             "file_length":           self.qsettings.value("file_length",           100,    type=int),
@@ -197,8 +197,8 @@ class ExperimentSettingsDialog(QDialog):
             self.qsettings.setValue("calibration_slope", 1.0)
             self.qsettings.setValue("calibration_intercept", 0.0)
 
-        slope = QSettings("HashemiLab", "NeuroStemVolt").value("calibration_slope", type=float)
-        intercept = QSettings("HashemiLab", "NeuroStemVolt").value("calibration_intercept", type=float)
+        slope = QSettings("HashemiLab", "NeuroStemSound").value("calibration_slope", type=float)
+        intercept = QSettings("HashemiLab", "NeuroStemSound").value("calibration_intercept", type=float)
         print(slope,intercept)
 
         # close dialog

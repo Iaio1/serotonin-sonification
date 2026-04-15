@@ -75,7 +75,7 @@ class IntroPage(QWizardPage):
             font-family: Helvetica, Arial;
             font-weight: bold;
         """)
-        footer = QLabel("© 2025 Hashemi Lab · NeuroStemVolt · v1.0.0")
+        footer = QLabel("© 2026 Hashemi Lab · NeuroStemSound · v1.0.0")
         footer.setAlignment(Qt.AlignCenter)
         footer.setStyleSheet("""
             color: gray;
@@ -220,8 +220,8 @@ class IntroPage(QWizardPage):
         # Run conversion from current to concentration
         #if self.QSettings():
         # Running 
-        slope = QSettings("HashemiLab", "NeuroStemVolt").value("calibration_slope", type=float)
-        intercept = QSettings("HashemiLab", "NeuroStemVolt").value("calibration_intercept", type=float)
+        slope = QSettings("HashemiLab", "NeuroStemSound").value("calibration_slope", type=float)
+        intercept = QSettings("HashemiLab", "NeuroStemSound").value("calibration_intercept", type=float)
         self.group_analysis.apply_calibration_to_all_experiments(slope,intercept)
         self.wizard().group_analysis = self.group_analysis
         self.wizard().display_names_list = self.display_names_list
