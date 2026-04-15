@@ -10,7 +10,7 @@ from ui.wizard_3_results.results_page import ResultsPage
 
 def main():
     """
-    Launches the NeuroStemVolt Qt application.
+    Launches the NeuroStemSound Qt application.
 
     This function initializes the Qt environment, displays a splash screen,
     and loads the multi-page wizard interface for processing FSCV replicates.
@@ -25,7 +25,7 @@ def main():
     
     # Load and scale the splash image
     base = os.path.dirname(__file__)
-    logo_path = os.path.join(base, 'ui/graphics/LogoNeuroStemVoltV1.0.0.png')
+    logo_path = os.path.join(base, 'ui/graphics/LogoNeuroStemSoundV1.0.0.png')
     
     # Check if file exists
     if not os.path.exists(logo_path):
@@ -84,7 +84,7 @@ def main():
     # Apply custom style
     wizard.button(QWizard.NextButton).setStyleSheet("""
         QPushButton {
-            background-color: #21AE62;
+            background-color: #7850C8;
             color: white;
             font-family: Helvetica, Arial;
             font-weight: bold;
@@ -92,13 +92,13 @@ def main():
             padding: 6px 12px;
         }
         QPushButton:hover {
-            background-color: #1E9955;
+            background-color: #6A45B5;
         }
         QPushButton:pressed {
-            background-color: #187D45;
+            background-color: #5A38A0;
         }
         QPushButton:disabled {
-            background-color: #A0D5BA;
+            background-color: #C4B0E8;
             color: white;
         }
     """)
@@ -123,9 +123,9 @@ def main():
         }
     """)
     
-    wizard.setWindowTitle("NeuroStemVolt")
+    wizard.setWindowTitle("NeuroStemSound")
     
-    icon_path = os.path.join(base, "ui", "ui/graphics/NSV_Logo_Icon.png")
+    icon_path = os.path.join(base, "ui", "ui/graphics/NSS_Logo_Icon.png")
     app.setWindowIcon(QIcon(icon_path))
     wizard.addPage(IntroPage())
     wizard.addPage(ColorPlotPage())

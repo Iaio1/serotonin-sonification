@@ -106,7 +106,7 @@ class PlotCanvas(FigureCanvas):
         self.fig.clear()
         self.axes.clear()
 
-        settings = QSettings("HashemiLab", "NeuroStemVolt")
+        settings = QSettings("HashemiLab", "NeuroStemSound")
         freq = settings.value("acquisition_frequency", 10, type=int)
         
         # Check if calibration is enabled
@@ -222,6 +222,7 @@ class PlotCanvas(FigureCanvas):
         ticks = np.arange(0, max_t + tick_interval, tick_interval)
         self.axes.set_xticks(ticks)
 
+        self.fig.subplots_adjust(top=0.88)
         self.draw()
 
     def _plot_decay_regions(self, metadata, t, freq):
@@ -321,7 +322,7 @@ class PlotCanvas(FigureCanvas):
         progress.show()
         QApplication.processEvents()  # Ensure dialog appears
 
-        settings = QSettings("HashemiLab", "NeuroStemVolt")
+        settings = QSettings("HashemiLab", "NeuroStemSound")
         freq = settings.value("acquisition_frequency", 10, type=int)
 
         try:
@@ -470,7 +471,7 @@ class PlotCanvas(FigureCanvas):
         """
         import numpy as np
         
-        settings = QSettings("HashemiLab", "NeuroStemVolt")
+        settings = QSettings("HashemiLab", "NeuroStemSound")
         calibration_enabled = settings.value("calibration_enabled", False, type=bool)
 
         # Show loading dialog
@@ -530,7 +531,7 @@ class PlotCanvas(FigureCanvas):
         QApplication.processEvents()
 
         try:
-            settings = QSettings("HashemiLab", "NeuroStemVolt")
+            settings = QSettings("HashemiLab", "NeuroStemSound")
             file_length_sec = settings.value("file_length", 100, type=int)
             time_between_files = settings.value("time_between_files", 10, type=float)
 
@@ -636,7 +637,7 @@ class PlotCanvas(FigureCanvas):
         QApplication.processEvents()
 
         try:
-            settings = QSettings("HashemiLab", "NeuroStemVolt")
+            settings = QSettings("HashemiLab", "NeuroStemSound")
             time_between_files = settings.value("time_between_files", 0, type=float)
 
             experiments = group_analysis.get_experiments()
@@ -774,7 +775,7 @@ class PlotCanvas(FigureCanvas):
         colors = ['#4178F2', '#FF3877', '#32CD32', '#FF8C00', '#9370DB', '#00CED1', '#FFD700', '#DC143C']
 
         # Plot CV for each peak time point
-        settings = QSettings("HashemiLab", "NeuroStemVolt")
+        settings = QSettings("HashemiLab", "NeuroStemSound")
         freq = settings.value("acquisition_frequency", 10, type=int)
 
         max_current = 0
@@ -886,7 +887,7 @@ class PlotCanvas(FigureCanvas):
         self.axes.set_ylabel("Current (nA)")
 
         # Convert time_point to seconds for display
-        settings = QSettings("HashemiLab", "NeuroStemVolt")
+        settings = QSettings("HashemiLab", "NeuroStemSound")
         freq = settings.value("acquisition_frequency", 10, type=int)
         time_sec = time_point / freq
 

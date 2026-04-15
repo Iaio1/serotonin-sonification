@@ -23,7 +23,7 @@ def apply_custom_styles(widget):
             # Save/export buttons (blue)
             widget.setStyleSheet("""
                 QPushButton {
-                    background-color: #4178F2;
+                    background-color: #7850C8;
                     color: white;
                     font-family: Arial, sans-serif;
                     font-weight: bold;
@@ -31,21 +31,21 @@ def apply_custom_styles(widget):
                     padding: 6px 12px;
                 }
                 QPushButton:hover {
-                    background-color: #3366CC;
+                    background-color: #6A45B5;
                 }
                 QPushButton:pressed {
-                    background-color: #264A9E;
+                    background-color: #5A38A0;
                 }
                 QPushButton:disabled {
-                    background-color: #AFCBF9;
+                    background-color: #C4B0E8;
                     color: white;
                 }
             """)
-        elif "clear" in label:
+        elif "clear" in label or "reverse" in label or "previous" in label or "next" in label:
             # Clear buttons (pink/red)
             widget.setStyleSheet("""
                 QPushButton {
-                    background-color: #FF3877;
+                    background-color: #E054A0;
                     color: white;
                     font-family: Arial, sans-serif;
                     font-weight: bold;
@@ -53,13 +53,13 @@ def apply_custom_styles(widget):
                     padding: 6px 12px;
                 }
                 QPushButton:hover {
-                    background-color: #E5306A;
+                    background-color: #C4458D;
                 }
                 QPushButton:pressed {
-                    background-color: #C12459;
+                    background-color: #A8377A;
                 }
                 QPushButton:disabled {
-                    background-color: #F5A9C4;
+                    background-color: #F0B0D0;
                     color: white;
                 }
             """)
@@ -67,7 +67,7 @@ def apply_custom_styles(widget):
             # General buttons (green)
             widget.setStyleSheet("""
                 QPushButton {
-                    background-color: #21AE62;
+                    background-color: #7850C8;
                     color: white;
                     font-family: Arial, sans-serif;
                     font-weight: bold;
@@ -75,13 +75,13 @@ def apply_custom_styles(widget):
                     padding: 6px 12px;
                 }
                 QPushButton:hover {
-                    background-color: #1E9955;
+                    background-color: #6A45B5;
                 }
                 QPushButton:pressed {
-                    background-color: #187D45;
+                    background-color: #5A38A0;
                 }
                 QPushButton:disabled {
-                    background-color: #A0D5BA;
+                    background-color: #C4B0E8;
                     color: white;
                 }
             """)

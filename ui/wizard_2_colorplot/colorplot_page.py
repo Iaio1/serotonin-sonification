@@ -86,12 +86,6 @@ class ColorPlotPage(QWizardPage):
 
         #btn_apply = QPushButton("Apply Filtering")
         self.btn_filter.clicked.connect(self.show_processing_options)
-        self.btn_save = QPushButton("Save Current Plots"); 
-        apply_custom_styles(self.btn_save)
-        self.btn_save.clicked.connect(self.save_IT_ColorPlot_Plots)
-        self.btn_export = QPushButton("Export Current IT")
-        apply_custom_styles(self.btn_export)
-        self.btn_export.clicked.connect(self.save_processed_data_IT)
         self.btn_char_extract = QPushButton("Characteristic Extraction")
         apply_custom_styles(self.btn_char_extract)
         self.btn_char_extract.clicked.connect(self.export_peak_characteristics)
@@ -105,7 +99,7 @@ class ColorPlotPage(QWizardPage):
         apply_custom_styles(self.btn_adj_peak)
         self.btn_adj_peak.clicked.connect(self.adjust_peak_position)
         for b in (self.btn_prev, self.btn_next, self.btn_eval, self.btn_filter,
-          self.btn_save, self.btn_export, self.btn_export_all, self.btn_adj_peak):
+                  self.btn_export_all, self.btn_adj_peak):
             b.setAutoDefault(False)
             b.setDefault(False)
 
@@ -132,8 +126,6 @@ class ColorPlotPage(QWizardPage):
         left.addWidget(self.btn_filter)
         left.addWidget(self.btn_eval)
         #left.addWidget(btn_apply)
-        left.addWidget(self.btn_save)
-        left.addWidget(self.btn_export)
         left.addWidget(self.btn_char_extract)
         left.addWidget(self.sonify_button)
         left.addWidget(self.btn_export_all)
@@ -145,23 +137,21 @@ class ColorPlotPage(QWizardPage):
 
 
         # Right plots
-        self.main_plot = PlotCanvas(self, width=5, height=4)
+        self.main_plot = None
 
-        self.it_plot = PlotCanvas(self, width=4, height=3)
+        self.it_plot = PlotCanvas(self, width=9, height=7)
 
         file_type = QSettings("HashemiLab", "NeuroStemVolt").value("file_type", "None", type=str)
         if file_type == "Spontaneous":
             # Add CV plot canvas
             self.cv_plot = PlotCanvas(self, width=2.5, height=2)
 
-        bottom = QHBoxLayout()
-        bottom.addWidget(self.it_plot)
-        if file_type == "Spontaneous":
-            bottom.addWidget(self.cv_plot)  # Add the CV plot here
-
         right = QVBoxLayout()
-        right.addWidget(self.main_plot)
-        right.addLayout(bottom)
+        right.addWidget(self.it_plot)
+        if file_type == "Spontaneous":
+            bottom = QHBoxLayout()
+            bottom.addWidget(self.cv_plot)
+            right.addLayout(bottom)
 
         # Main layout for the page
         main_layout = QVBoxLayout()
@@ -171,7 +161,7 @@ class ColorPlotPage(QWizardPage):
         main_layout.addLayout(content_layout)
 
         # Footer
-        footer = QLabel("© 2025 Hashemi Lab · NeuroStemVolt · v1.0.0")
+        footer = QLabel("© 2026 Hashemi Lab · NeuroStemSound · v1.0.0")
         footer.setAlignment(Qt.AlignCenter)
         footer.setStyleSheet("""
             color: gray;
@@ -270,7 +260,7 @@ class ColorPlotPage(QWizardPage):
         self.cbo_rep.clear()
         self.cbo_file.clear()
 
-        canvases = [self.main_plot, self.it_plot]
+        canvases = [self.it_plot]
         if hasattr(self, "cv_plot"):
             canvases.append(self.cv_plot)
 
@@ -332,7 +322,8 @@ class ColorPlotPage(QWizardPage):
             metadata = sph_file.get_metadata()
             peak_pos = QSettings("HashemiLab", "NeuroStemVolt").value("peak_position")
 
-            self.main_plot.plot_color(processed_data=processed_data, peak_pos=peak_pos)
+            if self.main_plot is not None:
+                self.main_plot.plot_color(processed_data=processed_data, peak_pos=peak_pos)
 
             self.it_plot.plot_IT(processed_data=processed_data, metadata=metadata, peak_position=peak_pos,
                                  temp_peak_detection=self.temp_peak)
@@ -424,7 +415,8 @@ class ColorPlotPage(QWizardPage):
                                 f"DEBUG: Using metadata for display: positions={current_metadata.get('peak_amplitude_positions')}, values={current_metadata.get('peak_amplitude_values')}")
 
                             # Update plots directly
-                            self.main_plot.plot_color(processed_data=processed_data, peak_pos=peak_pos)
+                            if self.main_plot is not None:
+                                self.main_plot.plot_color(processed_data=processed_data, peak_pos=peak_pos)
                             self.it_plot.plot_IT(processed_data=processed_data, metadata=current_metadata,
                                                  peak_position=peak_pos)
 
